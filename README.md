@@ -52,8 +52,8 @@ public class Main {
 
 ## 📈 Roadmap
 
-- [ ] **Phase 1:** Core Networking Engine & Virtual Thread Integration.
-- [ ] **Phase 2:** Byte-level HTTP/1.1 Request Parser (Method, Headers, Body).
+- [x] **Phase 1:** Core Networking Engine & Virtual Thread Integration.
+- [x] **Phase 2:** Byte-level HTTP/1.1 Request Parser (Method, Headers, Body).
 - [ ] **Phase 3:** O(1) Router and Middleware Pipeline.
 - [ ] **Phase 4:** TLS 1.3 / SSL Support.
 - [ ] **Phase 5:** Maven Central Publication (`io.github.bernardusz`).
