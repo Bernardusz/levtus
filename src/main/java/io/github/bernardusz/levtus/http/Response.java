@@ -2,6 +2,8 @@ package io.github.bernardusz.levtus.http;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,6 +12,7 @@ public class Response {
     private final BufferedOutputStream output;
     private int statusCode = 200;
     private Map<String, String> headers = new HashMap<String, String>();
+    private boolean isSent = false;
 
     public Response(BufferedOutputStream output) {
         this.output = output;
@@ -28,6 +31,8 @@ public class Response {
     }
 
     public void send(String body){
+        if (isSent) return;
+        isSent = true;
         byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
         try{
             // HTTP Status
@@ -42,9 +47,9 @@ public class Response {
     }
 
     private void writeHeaders(int contentLength) throws IOException {
-        headers.put("Content-Length", String.valueOf(contentLength));
+        headers.put("Content-Length", utf8Decoder(String.valueOf(contentLength)));
         for (var entry : headers.entrySet()) {
-            output.write((entry.getKey() + ": " + entry.getValue() + "\r\n").getBytes());
+            output.write((utf8Decoder(entry.getKey()) + ": " + utf8Decoder(entry.getValue()) + "\r\n").getBytes());
         }
         output.write("\r\n".getBytes());
     }
@@ -55,6 +60,10 @@ public class Response {
 
     private void writeStatus(int statusCode) throws IOException {
         output.write(("HTTP/1.1 " + statusCode + " " + getStatusText(statusCode) + "\r\n").getBytes());
+    }
+
+    private String utf8Decoder(String body){
+        return URLDecoder.decode(body, StandardCharsets.UTF_8);
     }
 
     private String getStatusText(int code) {
@@ -69,8 +78,8 @@ public class Response {
             case 405 -> "Method Not Allowed";
             case 500 -> "Internal Server Error";
             case 501 -> "Not Implemented";
-        case 503 -> "Service Unavailable";
-            default -> "OK";
+            case 503 -> "Service Unavailable";
+            default ->  "Unknown";
         };
     }
 }

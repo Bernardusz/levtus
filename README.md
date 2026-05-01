@@ -31,7 +31,7 @@ import io.github.bernardusz.levtus.Levtus;
 
 public class Main {
     public static void main(String[] args) {
-        Levtus app = Levtus.load(8080);
+        Levtus app = Levtus.create();
 
         // A simple GET route
         app.get("/hello", ctx -> {
@@ -54,7 +54,7 @@ public class Main {
 
 - [x] **Phase 1:** Core Networking Engine & Virtual Thread Integration.
 - [x] **Phase 2:** Byte-level HTTP/1.1 Request Parser (Method, Headers, Body).
-- [ ] **Phase 3:** O(1) Router and Middleware Pipeline.
+- [x] **Phase 3:** O(L) Router and Middleware Pipeline.
 - [ ] **Phase 4:** TLS 1.3 / SSL Support.
 - [ ] **Phase 5:** Maven Central Publication (`io.github.bernardusz`).
 

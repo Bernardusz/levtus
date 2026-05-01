@@ -3,20 +3,23 @@ package io.github.bernardusz.levtus.engine;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
+import io.github.bernardusz.levtus.routing.Router;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 public class LevtusEngine {
-    public final Map<String, Consumer<LevtusContext>> routes;
+    public final Router router;
 
-    public LevtusEngine(Map<String, Consumer<LevtusContext>> routes) {
-        this.routes = routes;
+    public LevtusEngine(Router router) {
+        this.router = router;
     }
 
     public void start(int port) {
@@ -41,28 +44,29 @@ public class LevtusEngine {
             BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
             BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream());
         ){
-            // Assemble the context Object
-            Request req = parseRequest(inputStream);
-            if (req == null) return;
+            client.setSoTimeout(5000);
             Response res = new Response(outputStream);
-            LevtusContext ctx = new LevtusContext(req, res);
 
-            // Find the route handler
-            String routeKey = req.method() + ":" + req.path();
-            Consumer<LevtusContext> handler = routes.get(routeKey);
-            if (handler != null) {
-                try {
-                    handler.accept(ctx);
+            try {
+                Request req = parseRequest(inputStream);
+                if (req == null) {
+                    res.status(400).send("400 - Bad Request");
+                    return;
                 }
-                catch (Exception e) {
-                    System.err.println("Handler error: " + e.getMessage());
-                    res.status(500).send("500 - An error occurred while processing the request.");
-                }
-            } else {
-                res.status(404).send("404 - Levtus cannot find this path.");
+
+                LevtusContext ctx = new LevtusContext(req, res);
+                client.setSoTimeout(10000);
+                router.handle(ctx);
+            }
+            catch (IllegalArgumentException e) {
+                res.status(400).send("400 - Bad Request (Malformed URL)");
+            }
+            catch (Exception e) {
+                res.status(500).send("500 - Internal Server Error");
+                throw e;
             }
         }
-        catch (IOException e) {
+        catch (Exception e) {
             System.err.println("An error occurred: " + e.getMessage());
         }
     }
@@ -72,7 +76,9 @@ public class LevtusEngine {
         if (requestLine == null || requestLine.isEmpty()) return null;
 
         String[] parts = requestLine.split(" ");
-        if (parts.length < 2) return null;
+        if (parts.length < 2){
+            return null;
+        }
 
         String method = parts[0];
 
@@ -91,13 +97,16 @@ public class LevtusEngine {
         String lengthStr = headers.getOrDefault("content-length", "0");
         if (!lengthStr.isEmpty()) {
             try{
+                final int MAX_BODY_SIZE = 10 * 1024 * 1024;
                 contentLength = Integer.parseInt(lengthStr);
+                if (contentLength > MAX_BODY_SIZE){
+                    throw new IOException("Payload Too Large: " + contentLength + " exceeds limit of " + MAX_BODY_SIZE);
+                }
             }
             catch (NumberFormatException e){
                 contentLength = 0;
             }
         }
-        byte[] body = inputStream.readNBytes(contentLength);
 
         // Parse the Path
         String rawPath = parts[1];
@@ -105,35 +114,49 @@ public class LevtusEngine {
         Map<String, String> queryParams = new HashMap<>();
         if (rawPath.contains("?")) {
             int queryStart = rawPath.indexOf("?");
-            path = rawPath.substring(0, queryStart);
+            path = utf8Decoder(rawPath.substring(0, queryStart));
             String queryString = rawPath.substring(queryStart + 1);
 
             for (String query : queryString.split("&")) {
                 String[] pair = query.split("=", 2);
                 if (pair.length == 2) {
-                    queryParams.put(pair[0], pair[1]);
+                    queryParams.put(utf8Decoder(pair[0]), utf8Decoder(pair[1]));
                 }
                 else if (pair.length >= 1 && !pair[0].isEmpty()) {
-                    queryParams.put(pair[0], "");
+                    queryParams.put(utf8Decoder(pair[0]), "");
                 }
             }
         }
         else {
-            path = rawPath;
+            path = utf8Decoder(rawPath);
         }
 
-        return new Request(method, path, headers, body, queryParams);
+        return new Request(method, path, headers, queryParams, inputStream);
     }
 
     private String readLine(InputStream inputStream) throws  IOException {
-        StringBuilder stringBuilder = new StringBuilder();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int b;
+        int count = 0;
+        final int MAX_LINE_SIZE = 8192; // 8 KB Limit
+
         while ((b = inputStream.read()) != -1) {
             if (b == '\n') break;
             if (b == '\r') continue;
-            stringBuilder.append((char) b);
+
+            buffer.write(b);
+            count++;
+
+            if (count > MAX_LINE_SIZE){
+                throw new IOException("HTTP Header line too long (Limit: " + MAX_LINE_SIZE + ")");
+            }
         }
-        if (b == -1 && stringBuilder.length() == 0) return "";
-        return  stringBuilder.toString();
+        if (b == -1 && count == 0) return "";
+        return buffer.toString(StandardCharsets.UTF_8);
     }
+
+    private String utf8Decoder(String body){
+        return URLDecoder.decode(body, StandardCharsets.UTF_8);
+    }
+
 }
