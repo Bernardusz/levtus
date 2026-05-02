@@ -1,56 +1,62 @@
-# Levtus - Levis Conatus
+# Levtus (Levis Conatus) 🚀
 
-**Levtus** is a high-performance, zero-dependency Java micro-framework designed for the modern JVM. 
+**Levtus** (Latin: *Levis Conatus* - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of **Java 21+ Virtual Threads (Project Loom)**.
 
-Most Java frameworks are built on "Black Boxes"—layers of dependencies that hide how the internet actually works. **Levtus** is different. It is a "Clean Room" implementation of a web server, built from the ground up using only the standard Java 21+ libraries.
+> "Infrastructure should be simple, transparent, and built to last."
 
-## 🚀 The Philosophy: "Zero-Dep, Total Control"
+---
 
-* **Zero Dependencies:** No Netty, no Jetty, no Jackson. The `pom.xml` is empty. Every byte is auditable.
-* **Virtual Threading:** Powered by **Project Loom**. Every incoming connection spawns a Virtual Thread, allowing for massive concurrency without the memory overhead of traditional thread pools.
-* **Architectural Sovereignty:** Built on raw `SSLServerSocket` and `java.io` to demonstrate a deep understanding of the TCP/IP and HTTP/1.1 protocols.
-* **Kotlin Interop:** Designed with Functional Interfaces (SAM) to be 100% compatible with Kotlin's idiomatic DSL syntax.
+## 🏗 Why Levtus?
 
-## 🏗️ Technical Architecture
+Most modern Java frameworks are built on top of complex abstractions like Netty or Jetty. **Levtus** was born from a desire to strip away the "magic" and build a protocol-compliant engine from raw sockets. 
 
-Levtus follows a "Modular Kernel" design. The core is lightweight, while advanced features (ORM, Templating) are plugged in via interfaces.
+It is designed for developers who need a minimalist, ultra-fast web core for microservices, embedded systems, or high-performance APIs without the overhead of a massive framework.
 
-| Component | Logic                                                                   |
-| :--- |:------------------------------------------------------------------------|
-| **Engine** | `java.net.ServerSocket` + `Executors.newVirtualThreadPerTaskExecutor()` |
-| **Routing** | O(L) Key-Value Lookup via `java.util.HashMap`                           |
-| **Security** | Native TLS 1.3 implementation via `SSLContext`                          |
-| **Concurrency** | Non-blocking feeling through synchronous Virtual Threads                |
+---
 
+## ⚡ Technical Highlights
 
+- **Loom-Native Concurrency:** Uses a `newVirtualThreadPerTaskExecutor` to handle thousands of concurrent connections with minimal memory footprint.
+- **Trie-Based Routing:** Features a high-performance Prefix Tree (Trie) router for $O(K)$ route matching (where $K$ is the path length).
+- **Zero Dependencies:** Pure Java. No external libraries, no "DLL hell," and ultra-small JAR size.
+- **Hardened Security:** Built-in protection against:
+  - **Path Traversal:** Secure `render()` logic with path normalization.
+  - **Memory Exhaustion:** Configurable limits for headers, body size, and line lengths.
+  - **Connection Overload:** Semaphore-based throttling to protect system resources.
+- **SSL/TLS Ready:** Native support for HTTPS via PKCS12 keystores.
+- **Fluent API:** Express-inspired context handling for JSON, HTML, and binary data.
 
-## 🛠️ Usage (Future API)
+---
+
+## 🚀 Quick Start
 
 ```java
-package io.github.bernardusz.levtus;
+import io.github.bernardusz.levtus.Levtus;
 
 public class Main {
     public static void main(String[] args) {
         Levtus app = Levtus.create();
 
-        // A simple GET route
-        app.get("/hello", ctx -> {
-            ctx.res().send("Hello from the Levtus Engine!");
+        // Middleware support
+        app.use((ctx, next) -> {
+            System.out.println("Request received: " + ctx.req().path());
+            next.run();
         });
 
+        // Simple GET route
+        app.get("/hello", ctx -> {
+            ctx.text("Hello from the Levtus Engine!");
+        });
+
+        // Dynamic routing with path params
+        app.get("/user/{id}", ctx -> {
+            String userId = ctx.param("id");
+            ctx.json("{\"id\": \"" + userId + "\"}");
+        });
+
+        // Secure static file rendering
         app.get("/", ctx -> {
             ctx.render("index.html");
-        });
-
-        app.ssl("./keystore.p12", "1234567");
-        app.staticFiles("./public");
-
-        // A POST route for data processing
-        app.post("/data", ctx -> {
-            byte[] body = ctx.req().body();
-            System.out.println(new String(body));
-            // Action: Save to DB or Cloud
-            ctx.res().status(201).send("Data Received");
         });
 
         app.listen(8080);
@@ -58,20 +64,34 @@ public class Main {
 }
 ```
 
-## 📈 Roadmap
+---
 
-- [x] **Phase 1:** Core Networking Engine & Virtual Thread Integration.
-- [x] **Phase 2:** Byte-level HTTP/1.1 Request Parser (Method, Headers, Body).
-- [x] **Phase 3:** O(L) Router and Middleware Pipeline.
-- [x] **Phase 4:** TLS 1.3 / SSL Support.
-- [ ] **Phase 5:** Maven Central Publication (`io.github.bernardusz`).
+## 🛠 Architecture & Internals
 
-## 🎓 Scholarship & Academic Context
+### The Request Lifecycle
+1. **Connection Throttling:** A global `Semaphore` limits active connections to prevent the JVM from being overwhelmed.
+2. **Virtual Thread Hand-off:** Each socket is handed to a Virtual Thread, keeping the main loop free for new accepts.
+3. **Protocol Parsing:** Raw `InputStream` parsing for HTTP/1.1 compliance, including support for persistent connections and keep-alive.
+4. **Trie Matching:** The router traverses the Trie to find the correct handler while extracting path parameters on the fly.
+5. **Middleware Execution:** A recursive execution chain allows for powerful pre- and post-processing.
 
-This project was developed as a technical thesis in minimalist software engineering. It aims to prove that modern Java can achieve high performance and security without relying on third-party ecosystems, prioritizing **Auditability** and **Fundamental Engineering**.
-Alongside to prove my capability in coding and creating useful tools without any dependencies.
+### Security Configurations
+Levtus gives you fine-grained control over your server's surface area:
+```java
+app.setMaxBodySize(10 * 1024 * 1024); // 10MB limit
+app.setMaxHeaderCount(100);
+app.setMaxLineSize(8192); // Prevent Slowloris attacks
+```
 
 ---
 
-**Author:** [Bernardusz](https://github.com/Bernardusz)  
-**License:** MIT
+## 📈 Performance
+By utilizing **Project Loom**, Levtus avoids the overhead of traditional thread-pooling and the complexity of reactive programming. It provides a simple, synchronous programming model that scales horizontally with hardware.
+
+---
+
+## 📜 License
+MIT License. Feel free to use, modify, and distribute.
+
+---
+*Built with 🐧 and raw sockets 🐧💀.*
