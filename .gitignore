@@ -37,3 +37,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+Main.java
+keystore.p12
+public
