@@ -1,120 +1,203 @@
 package io.github.bernardusz.levtus.engine;
 
+import io.github.bernardusz.levtus.exception.*;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
+import io.github.bernardusz.levtus.security.SecurityConfig;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URLDecoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
+import java.util.concurrent.Semaphore;
 
 public class LevtusEngine {
-    public final Router router;
+    private final Router router;
+    private volatile SecurityConfig securityConfig;
+    private int maxConcurrentConnections = 10000;
+    private int maxEmptyLines = 10;
+    private int maxBodySize = 10 * 1024 * 1024;
+    private int maxHeaderCount = 100;
+    private int maxLineSize = 8192; // 8 KB Limit
+    private int maxHeaderSize = 8192; // 8 KB Limit
+    private String staticFilesPath = "./public";
 
     public LevtusEngine(Router router) {
         this.router = router;
+        this.securityConfig = new SecurityConfig(null, null);
     }
 
     public void start(int port) {
         try (
             ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-            ServerSocket server = new ServerSocket(port);
+            ServerSocket server = securityConfig.getServerSocketFactory(port)
         ){
-            System.out.println("🚀 Levtus Engine started on port " + port);
-            while (true) {
+            System.out.println("🚀 Levtus Engine started on port " + port +
+                (securityConfig.isEnabled() ? " (HTTPS)" : " (HTTP)"));
+            Semaphore semaphore = new Semaphore(maxConcurrentConnections);
+            while (!Thread.currentThread().isInterrupted()) {
                 Socket client = server.accept();
-                executor.submit(() -> handleConnection(client));
+                if (semaphore.tryAcquire()) {
+                    executor.submit(() -> {
+                        try {
+                            handleConnection(client);
+                        } finally {
+                            semaphore.release();
+                        }
+                    });
+                } else {
+                    sendOverloadedResponse(client);
+                }
             }
         }
         catch (IOException e) {
-            System.err.println("An error occurred: " + e.getMessage());
+            System.err.println("❌ Engine failed: " + e.getMessage());
         }
+    }
+
+    public void ssl(String keystorePath, String keystorePass) {
+        this.securityConfig = new SecurityConfig(keystorePath, keystorePass);
     }
 
     private void handleConnection(Socket client) {
         try(
             client;
             BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-            BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream());
+            BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())
         ){
             client.setSoTimeout(5000);
-            Response res = new Response(outputStream);
+            Response res = new Response(outputStream, staticFilesPath);
 
             try {
-                Request req = parseRequest(inputStream);
-                if (req == null) {
-                    res.status(400).send("400 - Bad Request");
-                    return;
+                Request req;
+                while ((req = parseRequest(inputStream)) != null){
+                    res = new Response(outputStream, staticFilesPath);
+                    LevtusContext ctx = new LevtusContext(req, res);
+                    client.setSoTimeout(20000);
+                    router.handle(ctx);
+                    if (!res.isSent()) {
+                        res.status(404).send("404 - Not Found");
+                    }
+                    try{
+                        if (!req.isCached()) {
+                            inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+                        }
+                    }
+                    catch (EOFException e){
+                        break;
+                    }
                 }
-
-                LevtusContext ctx = new LevtusContext(req, res);
-                client.setSoTimeout(10000);
-                router.handle(ctx);
             }
             catch (IllegalArgumentException e) {
                 res.status(400).send("400 - Bad Request (Malformed URL)");
+            }
+            catch (LevtusHttpException e){
+                res.status(e.getStatusCode()).send(e.getMessage());
+            }
+            catch (SocketTimeoutException e){
+                res.status(408).send("408 - Request Timeout");
             }
             catch (Exception e) {
                 res.status(500).send("500 - Internal Server Error");
                 throw e;
             }
+
         }
         catch (Exception e) {
-            System.err.println("An error occurred: " + e.getMessage());
+            System.err.println("Connection failed: " + e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 
-    private Request parseRequest(InputStream inputStream) throws  IOException {
-        String requestLine = readLine(inputStream);
-        if (requestLine == null || requestLine.isEmpty()) return null;
+    private Request parseRequest(InputStream inputStream) throws IOException, URISyntaxException  {
+        String requestLine;
 
-        String[] parts = requestLine.split(" ");
+        // Read the request line
+        int b = 0;
+        while ((requestLine = readLine(inputStream)) != null && requestLine.isEmpty()){
+            b++;
+            if (b > maxEmptyLines){
+                throw new BadRequestException("400 - Bad Request (Request too large)");
+            }
+        }
+
+        if (requestLine == null) return null;
+
+        String[] parts = requestLine.split(" ", 3);
         if (parts.length < 2){
-            return null;
+            throw new BadRequestException("400 - Bad Request");
         }
 
         String method = parts[0];
 
         // Parse the Header
         String header;
-        Map<String, String> headers = new HashMap<String, String>();
-        while (!(header = readLine(inputStream)).isEmpty()){
-            String[] headerParts = header.split(": ", 2);
-            if (headerParts.length == 2){
-                headers.put(headerParts[0].toLowerCase().trim(), headerParts[1].trim());
+        int totalHeaderSize = 0;
+        Map<String, List<String>> headers = new HashMap<>();
+        while ((header = readLine(inputStream)) != null && !(header.isEmpty())){
+            totalHeaderSize += header.length();
+            if (totalHeaderSize > maxHeaderSize){
+                throw new HeaderTooLargeException("Header too large");
             }
+            if (headers.size() > maxHeaderCount) {
+                throw new HeaderTooLargeException("Too many headers");
+            }
+
+            String[] headerParts = header.split(":", 2);
+            if (headerParts.length == 2){
+                headers.computeIfAbsent(headerParts[0].toLowerCase().trim(), k -> new ArrayList<>()).add(headerParts[1].trim());
+            }
+        }
+        if (headers.get("host") == null){
+            throw new BadRequestException("400 - Bad Request (Missing host header)");
+        }
+        if (headers.get("transfer-encoding") != null){
+            throw new LevtusNotImplementedException(headers.get("transfer-encoding").getFirst());
         }
 
         // Parse the Body
-        int contentLength = 0;
-        String lengthStr = headers.getOrDefault("content-length", "0");
+        int contentLength;
+        List<String> lengthStrList = headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
+        if (lengthStrList.size() > 1){
+            throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
+        }
+        String lengthStr = lengthStrList.getFirst();
         if (!lengthStr.isEmpty()) {
             try{
-                final int MAX_BODY_SIZE = 10 * 1024 * 1024;
                 contentLength = Integer.parseInt(lengthStr);
-                if (contentLength > MAX_BODY_SIZE){
-                    throw new IOException("Payload Too Large: " + contentLength + " exceeds limit of " + MAX_BODY_SIZE);
+                if (contentLength > maxBodySize){
+                    throw new PayloadTooLargeException("Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
                 }
             }
-            catch (NumberFormatException e){
-                contentLength = 0;
-            }
+            catch (NumberFormatException _){}
         }
+
+
 
         // Parse the Path
         String rawPath = parts[1];
-        String path = "";
+        String path;
+
+        if (rawPath.startsWith("http")){
+            rawPath = rawPath.substring(rawPath.indexOf("//") + 2); // Strip until the https/http
+            rawPath = rawPath.substring(!rawPath.contains("/") ? 0 : rawPath.indexOf("/")); // with http:// or https://, it includes the full domain.
+            // So the first / is the domain name
+            if (rawPath.equals("/") || rawPath.isEmpty()){
+                rawPath = "/";
+            }
+        }
+        if (!rawPath.contains("/")) {
+            rawPath = "/";
+        }
+
         Map<String, String> queryParams = new HashMap<>();
         if (rawPath.contains("?")) {
             int queryStart = rawPath.indexOf("?");
-            path = utf8Decoder(rawPath.substring(0, queryStart));
+            path = rawPath.substring(0, queryStart);
             String queryString = rawPath.substring(queryStart + 1);
 
             for (String query : queryString.split("&")) {
@@ -128,18 +211,48 @@ public class LevtusEngine {
             }
         }
         else {
-            path = utf8Decoder(rawPath);
+            path = rawPath;
         }
 
-        return new Request(method, path, headers, queryParams, inputStream);
+        URI uri;
+        String newPath;
+        try{
+            uri = new URI(path).normalize();
+            //Now after http is gone, we need to fix every instance of double and trailing slashes
+            newPath = (uri.toString()).replaceAll("/{2,}", "/");
+        }
+        catch (URISyntaxException e){
+            throw new BadRequestException("400 - Bad Request");
+        }
+        return new Request(method, new URI(newPath).getRawPath(), headers, queryParams, inputStream, maxBodySize);
+    }
+
+    public void setMaxConcurrentConnections(int maxConcurrentConnections){
+        this.maxConcurrentConnections = maxConcurrentConnections;
+    }
+    public void setMaxEmptyLines(int maxEmptyLines){
+        this.maxEmptyLines = maxEmptyLines;
+    }
+    public void setMaxBodySize(int maxBodySize){
+        this.maxBodySize = maxBodySize;
+    }
+    public void setMaxHeaderCount(int maxHeaderCount){
+        this.maxHeaderCount = maxHeaderCount;
+    }
+    public void setMaxLineSize (int maxLineSize){
+        this.maxLineSize = maxLineSize;
+    }
+    public void setMaxHeaderSize(int maxHeaderSize) {
+        this.maxHeaderSize = maxHeaderSize;
+    }
+    public void setStaticFiles(String staticFilesPath){
+        this.staticFilesPath = staticFilesPath;
     }
 
     private String readLine(InputStream inputStream) throws  IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int b;
         int count = 0;
-        final int MAX_LINE_SIZE = 8192; // 8 KB Limit
-
         while ((b = inputStream.read()) != -1) {
             if (b == '\n') break;
             if (b == '\r') continue;
@@ -147,15 +260,33 @@ public class LevtusEngine {
             buffer.write(b);
             count++;
 
-            if (count > MAX_LINE_SIZE){
-                throw new IOException("HTTP Header line too long (Limit: " + MAX_LINE_SIZE + ")");
+            if (count > maxLineSize){
+                throw new HeaderTooLargeException("HTTP Header line too long (Limit: " + maxLineSize + ")");
             }
         }
-        if (b == -1 && count == 0) return "";
+        if (b == -1) return null;
         return buffer.toString(StandardCharsets.UTF_8);
     }
 
-    private String utf8Decoder(String body){
+    private void sendOverloadedResponse(Socket client) {
+        try (client; // This ensures the socket closes after the try block
+             OutputStream out = client.getOutputStream()) {
+
+            String response = """
+                HTTP/1.1 503 Service Unavailable\r
+                Content-Type: text/plain\r
+                Connection: close\r
+                \r
+                Server Overloaded: Please try again later.""";
+
+            out.write(response.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (IOException e) {
+            // If the client already disconnected, just ignore it
+        }
+    }
+
+    private String utf8Decoder(String body) throws IllegalArgumentException{
         return URLDecoder.decode(body, StandardCharsets.UTF_8);
     }
 

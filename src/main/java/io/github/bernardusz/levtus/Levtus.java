@@ -39,6 +39,39 @@ public class Levtus {
         router.use(middleware);
     }
 
+    public void ssl(String keystorePath, String keystorePass) {
+        engine.ssl(keystorePath, keystorePass);
+    }
+
+    public void setMaxConcurrentConnections(int maxConcurrentConnections){
+        engine.setMaxConcurrentConnections(maxConcurrentConnections);
+    }
+
+    public void setMaxEmptyLines(int maxEmptyLines){
+        engine.setMaxEmptyLines(maxEmptyLines);
+    }
+
+    public void setMaxBodySize(int maxBodySize){
+        engine.setMaxBodySize(maxBodySize);
+    }
+
+    public void setMaxHeaderCount(int maxHeaderCount){
+        engine.setMaxHeaderCount(maxHeaderCount);
+    }
+
+    public void setMaxLineSize (int maxLineSize){
+        engine.setMaxLineSize(maxLineSize);
+    }
+
+    public void setMaxHeaderSize(int maxHeaderSize){
+        engine.setMaxHeaderSize(maxHeaderSize);
+    }
+
+    public void staticFiles(String staticFilesPath){
+        engine.setStaticFiles(staticFilesPath);
+    }
+
+
     public void listen(int port) {
         engine.start(port);
     }

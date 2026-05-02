@@ -1,5 +1,6 @@
 package io.github.bernardusz.levtus.http;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public class LevtusContext{
@@ -33,6 +34,22 @@ public class LevtusContext{
         res.status(code).send(data);
     }
     public void send(int code, String contentType, String data) {
-        res.status(code).contentType(contentType).send(data);
+        res.status(code).contentType(contentType);
+        res.send(data);
+    }
+    public void html(String html) {
+        res.html(html);
+    }
+    public void text(String text) {
+        res.text(text);
+    }
+    public void sendBinary(byte[] body) {
+        res.sendBinary(body);
+    }
+    public void json(String json) {
+        res.json(json);
+    }
+    public void render(String htmlPath){
+        res.render(htmlPath);
     }
 }

@@ -15,19 +15,19 @@ Most Java frameworks are built on "Black Boxes"—layers of dependencies that hi
 
 Levtus follows a "Modular Kernel" design. The core is lightweight, while advanced features (ORM, Templating) are plugged in via interfaces.
 
-| Component | Logic |
-| :--- | :--- |
+| Component | Logic                                                                   |
+| :--- |:------------------------------------------------------------------------|
 | **Engine** | `java.net.ServerSocket` + `Executors.newVirtualThreadPerTaskExecutor()` |
-| **Routing** | O(1) Key-Value Lookup via `java.util.HashMap` |
-| **Security** | Native TLS 1.3 implementation via `SSLContext` |
-| **Concurrency** | Non-blocking feeling through synchronous Virtual Threads |
+| **Routing** | O(L) Key-Value Lookup via `java.util.HashMap`                           |
+| **Security** | Native TLS 1.3 implementation via `SSLContext`                          |
+| **Concurrency** | Non-blocking feeling through synchronous Virtual Threads                |
 
 
 
 ## 🛠️ Usage (Future API)
 
 ```java
-import io.github.bernardusz.levtus.Levtus;
+package io.github.bernardusz.levtus;
 
 public class Main {
     public static void main(String[] args) {
@@ -38,9 +38,17 @@ public class Main {
             ctx.res().send("Hello from the Levtus Engine!");
         });
 
+        app.get("/", ctx -> {
+            ctx.render("index.html");
+        });
+
+        app.ssl("./keystore.p12", "1234567");
+        app.staticFiles("./public");
+
         // A POST route for data processing
         app.post("/data", ctx -> {
             byte[] body = ctx.req().body();
+            System.out.println(new String(body));
             // Action: Save to DB or Cloud
             ctx.res().status(201).send("Data Received");
         });
@@ -55,7 +63,7 @@ public class Main {
 - [x] **Phase 1:** Core Networking Engine & Virtual Thread Integration.
 - [x] **Phase 2:** Byte-level HTTP/1.1 Request Parser (Method, Headers, Body).
 - [x] **Phase 3:** O(L) Router and Middleware Pipeline.
-- [ ] **Phase 4:** TLS 1.3 / SSL Support.
+- [x] **Phase 4:** TLS 1.3 / SSL Support.
 - [ ] **Phase 5:** Maven Central Publication (`io.github.bernardusz`).
 
 ## 🎓 Scholarship & Academic Context

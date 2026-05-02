@@ -2,6 +2,8 @@ package io.github.bernardusz.levtus.routing;
 
 import io.github.bernardusz.levtus.http.LevtusContext;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +44,7 @@ public class Router {
 
         Node current = root.children.get(method);
         if (current == null) {
-            ctx.send(404, "404 - Not Found");
+            ctx.res().status(404).send("404 - Not Found");
             return;
         }
 
@@ -50,6 +52,7 @@ public class Router {
         for (String segment : path.split("/")) {
             if (segment.isEmpty()) continue;
 
+            segment = utf8Decoder(segment);
             String upperSegment = segment.toUpperCase();
 
             if (current.children.containsKey(upperSegment)) {
@@ -83,6 +86,10 @@ public class Router {
         }
 
         current.run();
+    }
+
+    private String utf8Decoder(String body) throws IllegalArgumentException{
+        return URLDecoder.decode(body, StandardCharsets.UTF_8);
     }
 
     public void get(String path, Consumer<LevtusContext> handler) {
