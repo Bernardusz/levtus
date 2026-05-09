@@ -1,19 +1,38 @@
 package io.github.bernardusz.levtus.routing;
 
 import io.github.bernardusz.levtus.http.LevtusContext;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
+/**
+ * The type Node.
+ */
 public class Node {
-     final Map<String, Node> children = new HashMap<>();
-     Node wildcardChild = null;
-     String wildcardName = null;
+  /**
+   * The Children.
+   */
+final Map<String, Node> children = new HashMap<>();
+  /**
+   * The Wildcard child.
+   */
+Node wildcardChild = null;
+  /**
+   * The Wildcard name.
+   */
+String wildcardName = null;
 
-     Consumer<LevtusContext> handler;
+  /**
+   * The Handler.
+   */
+Consumer<LevtusContext> handler;
 
-     boolean isWildcard(){
-        return wildcardName != null;
-     }
+  /**
+   * Is wildcard boolean.
+   *
+   * @return  the boolean
+   */
+boolean isWildcard() {
+    return wildcardName != null;
+  }
 }
