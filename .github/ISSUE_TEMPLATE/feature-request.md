@@ -14,7 +14,7 @@ A clear and concise description of what the feature(s) is/are
 A clear and concise requirements of what you want to happen.
 
 ### 🚩Constraint
-A clear and concise constraint(s) of what you do not want to happen.
+A clear and concise constraint(s) you want to impose.
 
 ### 🌟Target 
 A clear and concise target(s)/API(s) of what you want.
