@@ -8,7 +8,11 @@ import javax.net.ServerSocketFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 
-/** The type Security config. */
+/**
+ * Configuration for server security.
+ * @param keystorePath The path to the .p12 file.
+ * @param keystorePass The password for the keystore.
+ */
 public record SecurityConfig(String keystorePath, String keystorePass) {
   /**
    * Is enabled boolean.

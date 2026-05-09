@@ -13,7 +13,13 @@ import java.util.function.Consumer;
  * The type Router.
  */
 public class Router {
+  /**
+   * The global middleware.
+   */
   private final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
+  /**
+   * The root node.
+   */
   private final Node root = new Node();
 
   /**
@@ -23,7 +29,7 @@ public class Router {
    * @param path the path
    * @param handler the handler
    */
-public void addRoute(String method, String path, Consumer<LevtusContext> handler) {
+  public void addRoute(String method, String path, Consumer<LevtusContext> handler) {
     Node current = root.children.computeIfAbsent(method.toUpperCase(), k -> new Node());
     for (String segment : path.split("/")) {
       if (segment.isEmpty()) continue;
@@ -51,7 +57,7 @@ public void addRoute(String method, String path, Consumer<LevtusContext> handler
    *
    * @param ctx the ctx
    */
-public void handle(LevtusContext ctx) {
+  public void handle(LevtusContext ctx) {
     String method = ctx.req().method().toUpperCase();
     String path = ctx.req().path();
 

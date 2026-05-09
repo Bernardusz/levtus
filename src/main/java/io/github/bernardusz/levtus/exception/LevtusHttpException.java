@@ -4,6 +4,9 @@ package io.github.bernardusz.levtus.exception;
  * The type Levtus http exception.
  */
 public class LevtusHttpException extends RuntimeException {
+  /**
+   * The status code.
+   */
   private final int statusCode;
 
   /**

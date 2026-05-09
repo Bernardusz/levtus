@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * The type Node.
+ * Node, represents a node in the routing tree.
  */
 public class Node {
   /**

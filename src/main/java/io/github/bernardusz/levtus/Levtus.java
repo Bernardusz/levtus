@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 /**
  *
  *
- * <h1>Levtus - Levis Conatus</h1>
+ * <h2>Levtus - Levis Conatus</h2>
  *
  * The main entry point for the Levtus HTTP engine.
  *
