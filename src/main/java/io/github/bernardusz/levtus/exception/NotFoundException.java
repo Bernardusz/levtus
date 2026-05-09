@@ -1,8 +1,6 @@
 package io.github.bernardusz.levtus.exception;
 
-/**
- * The type Not found exception.
- */
+/** The type Not found exception. */
 public class NotFoundException extends LevtusHttpException {
   /**
    * Instantiates a new Not found exception.

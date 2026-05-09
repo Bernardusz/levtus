@@ -5,9 +5,7 @@ import java.io.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The type Request.
- */
+/** The type Request. */
 public class Request {
   private final String method;
   private final String path;
@@ -28,7 +26,7 @@ public class Request {
    * @param bodyStream the body stream
    * @param maxBodySize the max body size
    */
-public Request(
+  public Request(
       String method,
       String path,
       Map<String, List<String>> headers,
@@ -46,36 +44,36 @@ public Request(
   /**
    * Method string.
    *
-   * @return  the string
+   * @return the string
    */
-public String method() {
+  public String method() {
     return method;
   }
 
   /**
    * Path string.
    *
-   * @return  the string
+   * @return the string
    */
-public String path() {
+  public String path() {
     return path;
   }
 
   /**
    * Headers map.
    *
-   * @return  the map
+   * @return the map
    */
-public Map<String, List<String>> headers() {
+  public Map<String, List<String>> headers() {
     return headers;
   }
 
   /**
    * Query params map.
    *
-   * @return  the map
+   * @return the map
    */
-public Map<String, String> queryParams() {
+  public Map<String, String> queryParams() {
     return queryParams;
   }
 
@@ -83,18 +81,18 @@ public Map<String, String> queryParams() {
    * Gets headers.
    *
    * @param name the name
-   * @return  the headers
+   * @return the headers
    */
-public List<String> getHeaders(String name) {
+  public List<String> getHeaders(String name) {
     return headers.getOrDefault(name.toLowerCase(), List.of());
   }
 
   /**
    * Bytes read int.
    *
-   * @return  the int
+   * @return the int
    */
-public int bytesRead() {
+  public int bytesRead() {
     return bytesRead;
   }
 
@@ -103,16 +101,16 @@ public int bytesRead() {
    *
    * @param bytesRead the bytes read
    */
-public void setBytesRead(int bytesRead) {
+  public void setBytesRead(int bytesRead) {
     this.bytesRead = bytesRead;
   }
 
   /**
    * Content type string.
    *
-   * @return  the string
+   * @return the string
    */
-public String contentType() {
+  public String contentType() {
     return getHeaders("content-type").isEmpty()
         ? "text/plain"
         : getHeaders("content-type").getFirst();
@@ -121,9 +119,9 @@ public String contentType() {
   /**
    * Content length int.
    *
-   * @return  the int
+   * @return the int
    */
-public int contentLength() {
+  public int contentLength() {
     try {
       return Integer.parseInt(
           getHeaders("content-length").isEmpty() ? "0" : getHeaders("content-length").getFirst());
@@ -136,18 +134,18 @@ public int contentLength() {
    * Query string.
    *
    * @param key the key
-   * @return  the string
+   * @return the string
    */
-public String query(String key) {
+  public String query(String key) {
     return queryParams.getOrDefault(key, "");
   }
 
   /**
    * Is cached boolean.
    *
-   * @return  the boolean
+   * @return the boolean
    */
-public boolean isCached() {
+  public boolean isCached() {
     return cachedBody != null;
   }
 

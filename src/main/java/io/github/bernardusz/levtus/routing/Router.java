@@ -9,17 +9,12 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/**
- * The type Router.
- */
+/** The type Router. */
 public class Router {
-  /**
-   * The global middleware.
-   */
+  /** The global middleware. */
   private final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
-  /**
-   * The root node.
-   */
+
+  /** The root node. */
   private final Node root = new Node();
 
   /**
@@ -114,7 +109,7 @@ public class Router {
    * @param path the path
    * @param handler the handler
    */
-public void get(String path, Consumer<LevtusContext> handler) {
+  public void get(String path, Consumer<LevtusContext> handler) {
     addRoute("GET", path, handler);
   }
 
@@ -124,7 +119,7 @@ public void get(String path, Consumer<LevtusContext> handler) {
    * @param path the path
    * @param handler the handler
    */
-public void post(String path, Consumer<LevtusContext> handler) {
+  public void post(String path, Consumer<LevtusContext> handler) {
     addRoute("POST", path, handler);
   }
 
@@ -134,7 +129,7 @@ public void post(String path, Consumer<LevtusContext> handler) {
    * @param path the path
    * @param handler the handler
    */
-public void put(String path, Consumer<LevtusContext> handler) {
+  public void put(String path, Consumer<LevtusContext> handler) {
     addRoute("PUT", path, handler);
   }
 
@@ -144,7 +139,7 @@ public void put(String path, Consumer<LevtusContext> handler) {
    * @param path the path
    * @param handler the handler
    */
-public void delete(String path, Consumer<LevtusContext> handler) {
+  public void delete(String path, Consumer<LevtusContext> handler) {
     addRoute("DELETE", path, handler);
   }
 

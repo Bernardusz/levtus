@@ -1,12 +1,8 @@
 package io.github.bernardusz.levtus.exception;
 
-/**
- * The type Levtus http exception.
- */
+/** The type Levtus http exception. */
 public class LevtusHttpException extends RuntimeException {
-  /**
-   * The status code.
-   */
+  /** The status code. */
   private final int statusCode;
 
   /**
@@ -15,7 +11,7 @@ public class LevtusHttpException extends RuntimeException {
    * @param message the message
    * @param statusCode the status code
    */
-public LevtusHttpException(String message, int statusCode) {
+  public LevtusHttpException(String message, int statusCode) {
     super(message);
     this.statusCode = statusCode;
   }
@@ -23,9 +19,9 @@ public LevtusHttpException(String message, int statusCode) {
   /**
    * Gets status code.
    *
-   * @return  the status code
+   * @return the status code
    */
-public int getStatusCode() {
+  public int getStatusCode() {
     return statusCode;
   }
 }

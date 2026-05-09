@@ -1,8 +1,6 @@
 package io.github.bernardusz.levtus.exception;
 
-/**
- * The type Bad request exception.
- */
+/** The type Bad request exception. */
 public class BadRequestException extends LevtusHttpException {
   /**
    * Instantiates a new Bad request exception.

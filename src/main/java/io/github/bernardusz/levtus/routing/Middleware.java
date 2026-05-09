@@ -2,9 +2,7 @@ package io.github.bernardusz.levtus.routing;
 
 import io.github.bernardusz.levtus.http.LevtusContext;
 
-/**
- * The interface Middleware.
- */
+/** The interface Middleware. */
 @FunctionalInterface
 public interface Middleware {
   /**

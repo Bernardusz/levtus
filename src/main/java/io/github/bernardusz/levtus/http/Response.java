@@ -8,15 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-/**
- * The type Response.
- */
+/** The type Response. */
 public class Response {
   private final BufferedOutputStream output;
-  /**
-   * The Static files path.
-   */
-String staticFilesPath;
+
+  /** The Static files path. */
+  String staticFilesPath;
+
   private int statusCode = 200;
   private Map<String, List<String>> headers = new HashMap<>();
   private boolean isSent = false;
@@ -27,7 +25,7 @@ String staticFilesPath;
    * @param output the output to the client/socket
    * @param staticFilesPath the static files path/directory
    */
-public Response(BufferedOutputStream output, String staticFilesPath) {
+  public Response(BufferedOutputStream output, String staticFilesPath) {
     this.output = output;
     this.staticFilesPath = staticFilesPath;
     headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
@@ -38,9 +36,9 @@ public Response(BufferedOutputStream output, String staticFilesPath) {
    * Status response.
    *
    * @param code the status code for Response
-   * @return  the Response object
+   * @return the Response object
    */
-public Response status(int code) {
+  public Response status(int code) {
     this.statusCode = code;
     return this;
   }
@@ -50,7 +48,7 @@ public Response status(int code) {
    *
    * @param type the type
    */
-public void contentType(String type) {
+  public void contentType(String type) {
     headers.put("Content-Type", new ArrayList<>(List.of(type)));
   }
 
@@ -59,9 +57,9 @@ public void contentType(String type) {
    *
    * @param name the name
    * @param value the value
-   * @return  the response
+   * @return the response
    */
-public Response addHeader(String name, String value) {
+  public Response addHeader(String name, String value) {
     headers.computeIfAbsent(name, _ -> new ArrayList<>());
     headers.get(name).add(value);
     return this;
@@ -83,7 +81,7 @@ public Response addHeader(String name, String value) {
    *
    * @param body the body of response (String)
    */
-public void send(String body) {
+  public void send(String body) {
     send(body.getBytes(StandardCharsets.UTF_8));
   }
 
@@ -92,7 +90,7 @@ public void send(String body) {
    *
    * @param body the body of response (HTML String)
    */
-public void html(String body) {
+  public void html(String body) {
     contentType("text/html");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -102,7 +100,7 @@ public void html(String body) {
    *
    * @param body the body of response (Plain Text)
    */
-public void text(String body) {
+  public void text(String body) {
     contentType("text/plain");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -112,7 +110,7 @@ public void text(String body) {
    *
    * @param body the body of response (Byte array)
    */
-public void sendBinary(byte[] body) {
+  public void sendBinary(byte[] body) {
     contentType("application/octet-stream");
     send(body);
   }
@@ -122,7 +120,7 @@ public void sendBinary(byte[] body) {
    *
    * @param body the body of response (JSON)
    */
-public void json(String body) {
+  public void json(String body) {
     contentType("application/json");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -132,7 +130,7 @@ public void json(String body) {
    *
    * @param htmlPath the path of HTML file
    */
-public void render(String htmlPath) {
+  public void render(String htmlPath) {
     Path filePath = Path.of(staticFilesPath, htmlPath).normalize();
 
     Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
@@ -168,7 +166,7 @@ public void render(String htmlPath) {
    *
    * @param bodyBytes the body bytes
    */
-public void send(byte[] bodyBytes) {
+  public void send(byte[] bodyBytes) {
     if (isSent) return;
     isSent = true;
     try {

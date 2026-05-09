@@ -10,6 +10,7 @@ import javax.net.ssl.SSLContext;
 
 /**
  * Configuration for server security.
+ *
  * @param keystorePath The path to the .p12 file.
  * @param keystorePass The password for the keystore.
  */
@@ -17,9 +18,9 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
   /**
    * Is enabled boolean.
    *
-   * @return  the boolean
+   * @return the boolean
    */
-public boolean isEnabled() {
+  public boolean isEnabled() {
     return keystorePath != null && keystorePass != null;
   }
 

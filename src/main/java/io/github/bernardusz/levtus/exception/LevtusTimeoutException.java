@@ -1,8 +1,6 @@
 package io.github.bernardusz.levtus.exception;
 
-/**
- * The type Levtus timeout exception.
- */
+/** The type Levtus timeout exception. */
 public class LevtusTimeoutException extends LevtusHttpException {
   /**
    * Instantiates a new Levtus timeout exception.

@@ -14,9 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
-/**
- * The type Levtus engine.
- */
+/** The type Levtus engine. */
 public class LevtusEngine {
   private final Router router;
   private volatile SecurityConfig securityConfig;
@@ -33,7 +31,7 @@ public class LevtusEngine {
    *
    * @param router the router
    */
-public LevtusEngine(Router router) {
+  public LevtusEngine(Router router) {
     this.router = router;
     this.securityConfig = new SecurityConfig(null, null);
   }
@@ -43,7 +41,7 @@ public LevtusEngine(Router router) {
    *
    * @param port the port
    */
-public void start(int port) {
+  public void start(int port) {
     try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         ServerSocket server = securityConfig.getServerSocketFactory(port)) {
       System.out.println(
@@ -77,7 +75,7 @@ public void start(int port) {
    * @param keystorePath the keystore path
    * @param keystorePass the keystore pass
    */
-public void ssl(String keystorePath, String keystorePass) {
+  public void ssl(String keystorePath, String keystorePass) {
     this.securityConfig = new SecurityConfig(keystorePath, keystorePass);
   }
 
@@ -246,7 +244,7 @@ public void ssl(String keystorePath, String keystorePass) {
    *
    * @param maxConcurrentConnections the max concurrent connections
    */
-public void setMaxConcurrentConnections(int maxConcurrentConnections) {
+  public void setMaxConcurrentConnections(int maxConcurrentConnections) {
     this.maxConcurrentConnections = maxConcurrentConnections;
   }
 
@@ -255,7 +253,7 @@ public void setMaxConcurrentConnections(int maxConcurrentConnections) {
    *
    * @param maxEmptyLines the max empty lines
    */
-public void setMaxEmptyLines(int maxEmptyLines) {
+  public void setMaxEmptyLines(int maxEmptyLines) {
     this.maxEmptyLines = maxEmptyLines;
   }
 
@@ -264,7 +262,7 @@ public void setMaxEmptyLines(int maxEmptyLines) {
    *
    * @param maxBodySize the max body size
    */
-public void setMaxBodySize(int maxBodySize) {
+  public void setMaxBodySize(int maxBodySize) {
     this.maxBodySize = maxBodySize;
   }
 
@@ -273,7 +271,7 @@ public void setMaxBodySize(int maxBodySize) {
    *
    * @param maxHeaderCount the max header count
    */
-public void setMaxHeaderCount(int maxHeaderCount) {
+  public void setMaxHeaderCount(int maxHeaderCount) {
     this.maxHeaderCount = maxHeaderCount;
   }
 
@@ -282,7 +280,7 @@ public void setMaxHeaderCount(int maxHeaderCount) {
    *
    * @param maxLineSize the max line size
    */
-public void setMaxLineSize(int maxLineSize) {
+  public void setMaxLineSize(int maxLineSize) {
     this.maxLineSize = maxLineSize;
   }
 
@@ -291,7 +289,7 @@ public void setMaxLineSize(int maxLineSize) {
    *
    * @param maxHeaderSize the max header size
    */
-public void setMaxHeaderSize(int maxHeaderSize) {
+  public void setMaxHeaderSize(int maxHeaderSize) {
     this.maxHeaderSize = maxHeaderSize;
   }
 
@@ -300,7 +298,7 @@ public void setMaxHeaderSize(int maxHeaderSize) {
    *
    * @param staticFilesPath the static files path
    */
-public void setStaticFiles(String staticFilesPath) {
+  public void setStaticFiles(String staticFilesPath) {
     this.staticFilesPath = staticFilesPath;
   }
 

@@ -5,34 +5,26 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/**
- * Node, represents a node in the routing tree.
- */
+/** Node, represents a node in the routing tree. */
 public class Node {
-  /**
-   * The Children.
-   */
-final Map<String, Node> children = new HashMap<>();
-  /**
-   * The Wildcard child.
-   */
-Node wildcardChild = null;
-  /**
-   * The Wildcard name.
-   */
-String wildcardName = null;
+  /** The Children. */
+  final Map<String, Node> children = new HashMap<>();
 
-  /**
-   * The Handler.
-   */
-Consumer<LevtusContext> handler;
+  /** The Wildcard child. */
+  Node wildcardChild = null;
+
+  /** The Wildcard name. */
+  String wildcardName = null;
+
+  /** The Handler. */
+  Consumer<LevtusContext> handler;
 
   /**
    * Is wildcard boolean.
    *
-   * @return  the boolean
+   * @return the boolean
    */
-boolean isWildcard() {
+  boolean isWildcard() {
     return wildcardName != null;
   }
 }
