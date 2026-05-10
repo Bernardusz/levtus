@@ -7,8 +7,6 @@ import io.github.bernardusz.levtus.routing.Router;
 import java.util.function.Consumer;
 
 /**
- *
- *
  * <h2>Levtus - Levis Conatus</h2>
  *
  * The main entry point for the Levtus HTTP engine.
@@ -16,153 +14,172 @@ import java.util.function.Consumer;
  * <p>Levtus is a high-performance, zero-dependency HTTP/1.1 server designed to leverage Java
  * Virtual Threads for efficient concurrency. It provides a fluent API for defining routes,
  * middleware, and server configurations.
+ * * @apiNote Use {@link #create()} to initialize the app, configure routes, and call {@link #listen(int)} to boot the server.
  */
 public class Levtus {
-  private final Router router = new Router();
-  private final LevtusEngine engine;
+    private final Router router = new Router();
+    private final LevtusEngine engine;
 
-  private Levtus() {
-    this.engine = new LevtusEngine(router);
-  }
+    private Levtus() {
+        this.engine = new LevtusEngine(router);
+    }
 
-  /**
-   * Creates a new instance of the Levtus application.
-   *
-   * @return a new Levtus instance
-   */
-  public static Levtus create() {
-    return new Levtus();
-  }
+    /**
+     * Initializes a new Levtus application instance with a fresh routing engine.
+     * <p>
+     * Usage: {@code Levtus app = Levtus.create();}
+     *
+     * @return a non-null Levtus instance ready for configuration
+     */
+    public static Levtus create() {
+        return new Levtus();
+    }
 
-  /**
-   * Registers a handler for GET requests at the specified path.
-   *
-   * @param path the URL path to match (e.g., "/hello")
-   * @param handler the logic to execute when the route is matched
-   */
-  public void get(String path, Consumer<LevtusContext> handler) {
-    router.get(path, handler);
-  }
+    /**
+     * Maps an HTTP GET request to a specific handler function.
+     * <p>
+     * {@code app.get("/hello", ctx -> ctx.res().send("World!"));}
+     *
+     * @param path    the exact URL path to match (must not be null, e.g., "/api/users")
+     * @param handler the functional callback executed upon a successful match (must not be null)
+     */
+    public void get(String path, Consumer<LevtusContext> handler) {
+        router.get(path, handler);
+    }
 
-  /**
-   * Registers a handler for POST requests at the specified path.
-   *
-   * @param path the URL path to match
-   * @param handler the logic to execute when the route is matched
-   */
-  public void post(String path, Consumer<LevtusContext> handler) {
-    router.post(path, handler);
-  }
+    /**
+     * Maps an HTTP POST request to a specific handler function.
+     * <p>
+     * {@code app.post("/submit", ctx -> System.out.println(ctx.req().body()));}
+     *
+     * @param path    the exact URL path to match (must not be null)
+     * @param handler the functional callback executed upon a successful match (must not be null)
+     */
+    public void post(String path, Consumer<LevtusContext> handler) {
+        router.post(path, handler);
+    }
 
-  /**
-   * Registers a handler for PUT requests at the specified path.
-   *
-   * @param path the URL path to match
-   * @param handler the logic to execute when the route is matched
-   */
-  public void put(String path, Consumer<LevtusContext> handler) {
-    router.put(path, handler);
-  }
+    /**
+     * Maps an HTTP PUT request to a specific handler function, typically used for updating resources.
+     *
+     * @param path    the exact URL path to match (must not be null)
+     * @param handler the functional callback executed upon a successful match (must not be null)
+     */
+    public void put(String path, Consumer<LevtusContext> handler) {
+        router.put(path, handler);
+    }
 
-  /**
-   * Registers a handler for DELETE requests at the specified path.
-   *
-   * @param path the URL path to match
-   * @param handler the logic to execute when the route is matched
-   */
-  public void delete(String path, Consumer<LevtusContext> handler) {
-    router.delete(path, handler);
-  }
+    /**
+     * Maps an HTTP DELETE request to a specific handler function.
+     *
+     * @param path    the exact URL path to match (must not be null)
+     * @param handler the functional callback executed upon a successful match (must not be null)
+     */
+    public void delete(String path, Consumer<LevtusContext> handler) {
+        router.delete(path, handler);
+    }
 
-  /**
-   * Adds a global middleware to the request processing chain.
-   *
-   * @param middleware the middleware logic to execute for every request
-   */
-  public void use(Middleware middleware) {
-    router.use(middleware);
-  }
+    /**
+     * Injects a global middleware into the request processing pipeline.
+     * Middleware runs sequentially for every incoming request before hitting the final route handler.
+     * <p>
+     * {@code app.use((req, res, next) -> { System.out.println("Incoming!"); next.run(); });}
+     *
+     * @param middleware the interceptor logic (must not be null)
+     */
+    public void use(Middleware middleware) {
+        router.use(middleware);
+    }
 
-  /**
-   * Configures SSL/TLS for the server using a PKCS12 keystore.
-   *
-   * @param keystorePath the path to the .p12 or .jks keystore file
-   * @param keystorePass the password for the keystore
-   */
-  public void ssl(String keystorePath, String keystorePass) {
-    engine.ssl(keystorePath, keystorePass);
-  }
+    /**
+     * Secures the server by enabling SSL/TLS using a provided keystore.
+     * Must be called before {@link #listen(int)}.
+     *
+     * @param keystorePath the file system path to the .p12 or .jks keystore file (must not be null)
+     * @param keystorePass the plain-text password to unlock the keystore (must not be null)
+     */
+    public void ssl(String keystorePath, String keystorePass) {
+        engine.ssl(keystorePath, keystorePass);
+    }
 
-  /**
-   * Sets the maximum number of concurrent connections the server will accept. This acts as a global
-   * throttle to protect system resources.
-   *
-   * @param maxConcurrentConnections the maximum number of active connections
-   */
-  public void setMaxConcurrentConnections(int maxConcurrentConnections) {
-    engine.setMaxConcurrentConnections(maxConcurrentConnections);
-  }
+    /**
+     * Restricts the maximum number of concurrent client connections.
+     * Acts as a global throttle to prevent thread starvation and protect system resources.
+     *
+     * @param maxConcurrentConnections the absolute upper limit for active connections
+     */
+    public void setMaxConcurrentConnections(int maxConcurrentConnections) {
+        engine.setMaxConcurrentConnections(maxConcurrentConnections);
+    }
 
-  /**
-   * Sets the maximum number of empty lines allowed between requests in a persistent connection.
-   *
-   * @param maxEmptyLines the maximum number of allowed empty lines
-   */
-  public void setMaxEmptyLines(int maxEmptyLines) {
-    engine.setMaxEmptyLines(maxEmptyLines);
-  }
+    /**
+     * Defines the maximum number of empty lines tolerated between requests on a Keep-Alive connection.
+     * Prevents idle connection abuse.
+     *
+     * @param maxEmptyLines the maximum allowed consecutive empty lines
+     */
+    public void setMaxEmptyLines(int maxEmptyLines) {
+        engine.setMaxEmptyLines(maxEmptyLines);
+    }
 
-  /**
-   * Sets the maximum allowed size for the request body in bytes.
-   *
-   * @param maxBodySize the maximum body size in bytes
-   */
-  public void setMaxBodySize(int maxBodySize) {
-    engine.setMaxBodySize(maxBodySize);
-  }
+    /**
+     * Imposes a hard limit on the HTTP request body size to prevent memory exhaustion (OOM) attacks.
+     * If a client sends a payload exceeding this limit, the connection is rejected.
+     *
+     * @param maxBodySize the absolute byte limit for the payload (e.g., 1048576 for 1MB)
+     */
+    public void setMaxBodySize(int maxBodySize) {
+        engine.setMaxBodySize(maxBodySize);
+    }
 
-  /**
-   * Sets the maximum number of headers allowed in a single request.
-   *
-   * @param maxHeaderCount the maximum number of headers
-   */
-  public void setMaxHeaderCount(int maxHeaderCount) {
-    engine.setMaxHeaderCount(maxHeaderCount);
-  }
+    /**
+     * Restricts the maximum number of HTTP headers a client can send in a single request.
+     * Protects against header-smuggling or buffer overflow attacks.
+     *
+     * @param maxHeaderCount the upper limit for incoming headers
+     */
+    public void setMaxHeaderCount(int maxHeaderCount) {
+        engine.setMaxHeaderCount(maxHeaderCount);
+    }
 
-  /**
-   * Sets the maximum length of a single request line (e.g., the URL line).
-   *
-   * @param maxLineSize the maximum line size in characters
-   */
-  public void setMaxLineSize(int maxLineSize) {
-    engine.setMaxLineSize(maxLineSize);
-  }
+    /**
+     * Sets the maximum character length for the initial HTTP request line (Method + URI + Protocol).
+     * Useful to prevent URI Too Long attacks.
+     *
+     * @param maxLineSize the maximum allowed characters in the request line
+     */
+    public void setMaxLineSize(int maxLineSize) {
+        engine.setMaxLineSize(maxLineSize);
+    }
 
-  /**
-   * Sets the maximum cumulative size of all headers in a request.
-   *
-   * @param maxHeaderSize the maximum header size in bytes
-   */
-  public void setMaxHeaderSize(int maxHeaderSize) {
-    engine.setMaxHeaderSize(maxHeaderSize);
-  }
+    /**
+     * Defines the maximum cumulative byte size allowed for all HTTP headers combined.
+     *
+     * @param maxHeaderSize the maximum header block size in bytes
+     */
+    public void setMaxHeaderSize(int maxHeaderSize) {
+        engine.setMaxHeaderSize(maxHeaderSize);
+    }
 
-  /**
-   * Configures the directory from which static files (HTML, CSS, JS) will be served.
-   *
-   * @param staticFilesPath the directory path containing static assets
-   */
-  public void staticFiles(String staticFilesPath) {
-    engine.setStaticFiles(staticFilesPath);
-  }
+    /**
+     * Designates a local directory to automatically serve static web assets (HTML, CSS, JS, Images).
+     * <p>
+     * {@code app.staticFiles("public");} // Serves files from the "public" folder
+     *
+     * @param staticFilesPath the relative or absolute path to the directory (must not be null)
+     */
+    public void staticFiles(String staticFilesPath) {
+        engine.setStaticFiles(staticFilesPath);
+    }
 
-  /**
-   * Starts the server and begins listening for connections on the specified port.
-   *
-   * @param port the TCP port to listen on (e.g., 8080)
-   */
-  public void listen(int port) {
-    engine.start(port);
-  }
+    /**
+     * Binds the Levtus application to a specific TCP port and boots the server.
+     * <p>
+     * @implNote This is a blocking operation; the main thread will halt here while the server is active.
+     *
+     * @param port the valid TCP port number (1-65535) to listen on
+     */
+    public void listen(int port) {
+        engine.start(port);
+    }
 }
