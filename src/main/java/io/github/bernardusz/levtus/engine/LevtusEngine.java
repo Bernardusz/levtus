@@ -14,7 +14,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
-/** The type Levtus engine. */
+/**
+ * The Levtus engine that handles HTTP requests. Parsing and Creating Request, instantiating Response and LevtusContext (ctx) and passing works to the router.
+ *
+ * @author Bernardusz
+ * @version 0.1.1
+ */
 public class LevtusEngine {
   private final Router router;
   private volatile SecurityConfig securityConfig;
@@ -37,7 +42,9 @@ public class LevtusEngine {
   }
 
   /**
-   * Start.
+   * Starts the Levtus engine based on the provided port.
+   *
+   * Will start on HTTP by default, unless SSL is configured via {@link #ssl(String, String)}.
    *
    * @param port the port
    */
@@ -70,7 +77,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Ssl.
+   * Configures the Levtus engine to use SSL by providing the keystore path and password.
    *
    * @param keystorePath the keystore path
    * @param keystorePass the keystore pass
@@ -79,6 +86,19 @@ public class LevtusEngine {
     this.securityConfig = new SecurityConfig(keystorePath, keystorePass);
   }
 
+  /**
+   * Handles the connection from a client.
+   *
+   * Responsible for:
+   * - Reading from the client socket
+   * - Parsing incoming Request
+   * - Instantiating Response and LevtusContext
+   * - Passing the work to the router
+   * - Sending the response
+   * - Closing the client socket
+   *
+   * @param client the client socket
+   */
   private void handleConnection(Socket client) {
     try (client;
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
@@ -121,6 +141,30 @@ public class LevtusEngine {
     }
   }
 
+  /**
+   * Responsible for parsing the request from the client socket.
+   *
+   * Parses:
+   * - Request line
+   * - Headers
+   * - Body
+   *
+   * Immediately throws an Exception if:
+   * - Request line is invalid
+   * - Headers are invalid
+   * - Body is invalid
+   *
+   * Without waiting for all of them; one problem, Exception is thrown
+   *
+   * @param inputStream The stream to read the HTTP request from
+   * @return {@link Request} A fully parsed Request object, or null if the stream is empty
+   * @throws IOException If a network or stream error occurs
+   * @throws URISyntaxException If the request line is invalid
+   * @throws BadRequestException If the request line is invalid or headers are malformed
+   * @throws PayloadTooLargeException If the request's body size exceeds {@link #maxBodySize}, set via {@link #setMaxBodySize(int)}
+   * @throws HeaderTooLargeException If the header's total size exceeds {@link #maxHeaderSize}, set via {@link #setMaxHeaderSize(int)}
+   * @throws LevtusNotImplementedException If the method is not implemented.
+   */
   private Request parseRequest(InputStream inputStream) throws IOException, URISyntaxException {
     String requestLine;
 
@@ -240,7 +284,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max concurrent connections.
+   * Sets max concurrent connections for the server.
    *
    * @param maxConcurrentConnections the max concurrent connections
    */
@@ -249,7 +293,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max empty lines.
+   * Sets max empty lines in the request for Keep-Alive connection.
    *
    * @param maxEmptyLines the max empty lines
    */
@@ -258,7 +302,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max body size.
+   * Sets the global max body size for all incoming requests.
    *
    * @param maxBodySize the max body size
    */
@@ -267,7 +311,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max header count.
+   * Sets the global max header count for all incoming requests.
    *
    * @param maxHeaderCount the max header count
    */
@@ -276,7 +320,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max line size.
+   * Sets the global max size of a line for all incoming requests.
    *
    * @param maxLineSize the max line size
    */
@@ -285,7 +329,7 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets max header size.
+   * Sets the max header size for all incoming requests.
    *
    * @param maxHeaderSize the max header size
    */
@@ -294,7 +338,9 @@ public class LevtusEngine {
   }
 
   /**
-   * Sets static files.
+   * Sets the path/directory in which all static files are set.
+   *
+   * Default to {@link #staticFilesPath}
    *
    * @param staticFilesPath the static files path
    */
