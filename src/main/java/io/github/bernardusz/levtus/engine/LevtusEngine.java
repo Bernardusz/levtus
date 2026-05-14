@@ -89,13 +89,15 @@ public class LevtusEngine {
   /**
    * Handles the connection from a client.
    *
-   * Responsible for:
-   * - Reading from the client socket
-   * - Parsing incoming Request
-   * - Instantiating Response and LevtusContext
-   * - Passing the work to the router
-   * - Sending the response
-   * - Closing the client socket
+   * <p>Responsible for:</p>
+   * <ul>
+   * <li>Reading from the client socket</li>
+   * <li>Parsing incoming Request</li>
+   * <li>Instantiating Response and LevtusContext</li>
+   * <li>Passing the work to the router</li>
+   * <li>Sending the response</li>
+   * <li>Closing the client socket</li>
+   * </ul>
    *
    * @param client the client socket
    */
@@ -144,17 +146,20 @@ public class LevtusEngine {
   /**
    * Responsible for parsing the request from the client socket.
    *
-   * Parses:
-   * - Request line
-   * - Headers
-   * - Body
-   *
+   * <p>Parses:</p>
+   * <ul>
+   * <li>Request line</li>
+   * <li>Headers</li>
+   * <li>Body</li>
+   * </ul>
    * Immediately throws an Exception if:
-   * - Request line is invalid
-   * - Headers are invalid
-   * - Body is invalid
+   * <ul>
+   * <li>Request line is invalid</li>
+   * <li>Headers are invalid</li>
+   * <li>Body is invalid</li>
+   * </ul>
    *
-   * Without waiting for all of them; one problem, Exception is thrown
+   * <p>Without waiting for all of them; one problem, Exception is thrown</p>
    *
    * @param inputStream The stream to read the HTTP request from
    * @return {@link Request} A fully parsed Request object, or null if the stream is empty
