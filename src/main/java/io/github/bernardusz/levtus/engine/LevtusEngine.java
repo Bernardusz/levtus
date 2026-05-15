@@ -103,8 +103,8 @@ public class LevtusEngine {
 
   private void handleConnection(Socket client) {
     try (client;
-         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-         BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
+        BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
+        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
       client.setSoTimeout(5000);
       Response res = new Response(outputStream, staticFilesPath);
 
