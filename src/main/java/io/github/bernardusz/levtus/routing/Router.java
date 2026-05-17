@@ -9,20 +9,37 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/** The type Router. */
+/** The Router for storing routes (and their handler) and handling requests.
+ *
+ * <p>Router is responsible for:
+ * <ul>
+ *   <li>Storing routes (and their handler) as Nodes in a Prefix Tree (Trie) {@link Router#root}</li>
+ *   <li>Executing the middleware chain {@link Router#executeChain(LevtusContext, Consumer)}</li>
+ *   <li>Executing the route handler {@link Router#handle(LevtusContext)}</li>
+ * </ul>
+ *
+ * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the appropriate handlers.</p>
+ *
+ * */
 public class Router {
-  /** The global middleware. */
+  /** The global CopyOnWriteArrayList of middleware that is executed before the route handler. */
   private final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
 
-  /** The root node. */
+  /** The root node of the Prefix Tree (Trie) that stores the routes.
+   *
+   * <p>Inside this Node is a Trie structure, that stores the routes.</p>
+   *
+   * <p>TLDR: The root node is the starting point of the Trie structure that stores the routes.</p>
+   *
+   * */
   private final Node root = new Node();
 
   /**
-   * Add route.
+   * The method that stores the route in the Trie structure.
    *
-   * @param method the method
-   * @param path the path
-   * @param handler the handler
+   * @param method the HTTP method
+   * @param path the path of the route
+   * @param handler the handler/lambda of the route
    */
   public void addRoute(String method, String path, Consumer<LevtusContext> handler) {
     Node current = root.children.computeIfAbsent(method.toUpperCase(), k -> new Node());
@@ -48,9 +65,9 @@ public class Router {
   }
 
   /**
-   * Handle.
+   * The method that handles the request by matching the route and executing the middleware chain first before the route handler.
    *
-   * @param ctx the ctx
+   * @param ctx the {@link LevtusContext} containing the request and response objects
    */
   public void handle(LevtusContext ctx) {
     String method = ctx.req().method().toUpperCase();
@@ -87,6 +104,22 @@ public class Router {
     }
   }
 
+  /**
+   * The method that builds the chain of execution, going from the router handler to last middleware to the first middleware.
+   *
+   * <p>Explanation:</p>
+   * <ul>
+   *   <li>Creates a {@link Runnable} that represents the final handler</li>
+   *   <li>Iterates over the global middleware in reverse order</li>
+   *   <li>For each middleware, creates a new {@link Runnable} that calls the middleware with the next step</li>
+   *   <li>Finally, calls the {@link Runnable} that represents the final handler</li>
+   * </ul>
+   *
+   * <p>TLDR: The method that builds the chain of execution, going from the router handler to last middleware to the first middleware before executing them.</p>
+   *
+   * @param ctx The {@link LevtusContext} containing the request and response objects
+   * @param finalHandler The terminal route handler to be executed at the end of the chain
+   */
   private void executeChain(LevtusContext ctx, Consumer<LevtusContext> finalHandler) {
     Runnable current = () -> finalHandler.accept(ctx);
 
@@ -104,7 +137,9 @@ public class Router {
   }
 
   /**
-   * Get.
+   * A shortcut for adding a GET route.
+   *
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
    *
    * @param path the path
    * @param handler the handler
@@ -114,7 +149,9 @@ public class Router {
   }
 
   /**
-   * Post.
+   * A shortcut for adding a POST route.
+   *
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
    *
    * @param path the path
    * @param handler the handler
@@ -124,7 +161,9 @@ public class Router {
   }
 
   /**
-   * Put.
+   * A shortcut for adding a PUT route.
+   *
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
    *
    * @param path the path
    * @param handler the handler
@@ -134,7 +173,9 @@ public class Router {
   }
 
   /**
-   * Delete.
+   * A shortcut for adding a DELETE route.
+   *
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
    *
    * @param path the path
    * @param handler the handler
@@ -144,9 +185,9 @@ public class Router {
   }
 
   /**
-   * Use.
+   * Adds a middleware to the global middleware chain.
    *
-   * @param middleware the middleware
+   * @param middleware the Middleware
    */
   public void use(Middleware middleware) {
     globalMiddleware.add(middleware);
