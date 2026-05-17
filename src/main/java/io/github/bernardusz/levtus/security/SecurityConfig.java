@@ -38,7 +38,7 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
    * @return a configured ServerSocket (secure or non-secure)
    * @throws RuntimeException if the keystore cannot be loaded or the SSL context fails to initialize
    */
-  public ServerSocket getServerSocketFactory(int port) {
+  public ServerSocket getServerSocket(int port) {
     try {
       ServerSocketFactory serverSocketFactory = null;
       if (keystorePath != null && keystorePass != null) {
