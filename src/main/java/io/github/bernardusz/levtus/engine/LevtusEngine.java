@@ -72,7 +72,7 @@ public class LevtusEngine {
    */
   public void start(int port) {
     try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-        ServerSocket server = securityConfig.getServerSocketFactory(port)) {
+        ServerSocket server = securityConfig.getServerSocket(port)) {
       System.out.println(
           "🚀 Levtus Engine started on port "
               + port
