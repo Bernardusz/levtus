@@ -8,11 +8,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-/** The type Response. */
+/**
+ * Represents an outgoing HTTP/1.1 response.
+ *
+ * <p>Provides a fluent API to construct and send data back to the client. It handles headers,
+ * status codes, and various payload formats (text, JSON, HTML, binary files).
+ */
 public class Response {
   private final BufferedOutputStream output;
 
-  /** The Static files path. */
+  /** The base directory path from which static files are served. */
   String staticFilesPath;
 
   private int statusCode = 200;
@@ -20,10 +25,11 @@ public class Response {
   private boolean isSent = false;
 
   /**
-   * Instantiates a new Response.
+   * Initializes a new HTTP response bound to a client socket's output stream.
    *
-   * @param output the output to the client/socket
-   * @param staticFilesPath the static files path/directory
+   * @implNote Automatically injects default headers like "Content-Type" and "Server".
+   * @param output the buffered output stream connected to the client (must not be null)
+   * @param staticFilesPath the directory path for resolving static files (must not be null)
    */
   public Response(BufferedOutputStream output, String staticFilesPath) {
     this.output = output;
@@ -33,10 +39,12 @@ public class Response {
   }
 
   /**
-   * Status response.
+   * Sets the HTTP response status code.
    *
-   * @param code the status code for Response
-   * @return the Response object
+   * <p>{@code res.status(404).send("Not Found");}
+   *
+   * @param code the 3-digit HTTP status code (e.g., 200, 404, 500)
+   * @return the current Response instance for method chaining
    */
   public Response status(int code) {
     this.statusCode = code;
@@ -44,20 +52,20 @@ public class Response {
   }
 
   /**
-   * Return the Content type of the response.
+   * Overrides the "Content-Type" header for the outgoing response.
    *
-   * @param type the type
+   * @param type the MIME type string (e.g., "application/json", "text/html") (must not be null)
    */
   public void contentType(String type) {
     headers.put("Content-Type", new ArrayList<>(List.of(type)));
   }
 
   /**
-   * Add header to the response.
+   * Appends a new header or adds a value to an existing header.
    *
-   * @param name the name
-   * @param value the value
-   * @return the response
+   * @param name the header name (must not be null)
+   * @param value the header value (must not be null)
+   * @return the current Response instance for method chaining
    */
   public Response addHeader(String name, String value) {
     headers.computeIfAbsent(name, _ -> new ArrayList<>());
@@ -66,29 +74,29 @@ public class Response {
   }
 
   /**
-   * Is sent boolean.
+   * Checks if the response payload has already been written to the socket stream. Once sent,
+   * further attempts to modify headers or write to the body will be ignored.
    *
-   * <p>Checks whether the Response has been sent.
-   *
-   * @return the boolean
+   * @return {@code true} if the response is fully sent, {@code false} otherwise
    */
   public boolean isSent() {
     return isSent;
   }
 
   /**
-   * Send the body of the response (byte array).
+   * Encodes a string into UTF-8 bytes and sends it as the response payload.
    *
-   * @param body the body of response (String)
+   * @param body the raw string payload to send (must not be null)
    */
   public void send(String body) {
     send(body.getBytes(StandardCharsets.UTF_8));
   }
 
   /**
-   * Send the body of the response (HTML String).
+   * Sends an HTML string as the response payload, automatically setting the "Content-Type" to
+   * "text/html".
    *
-   * @param body the body of response (HTML String)
+   * @param body the HTML formatted string (must not be null)
    */
   public void html(String body) {
     contentType("text/html");
@@ -96,9 +104,10 @@ public class Response {
   }
 
   /**
-   * Send the body of the response (Plain Text).
+   * Sends a plain text string as the response payload, automatically setting the "Content-Type" to
+   * "text/plain".
    *
-   * @param body the body of response (Plain Text)
+   * @param body the plain text string (must not be null)
    */
   public void text(String body) {
     contentType("text/plain");
@@ -106,9 +115,10 @@ public class Response {
   }
 
   /**
-   * Send the body of the response (Byte array) - Will be sent as downloadable.
+   * Sends a raw byte array as a downloadable payload, automatically setting the "Content-Type" to
+   * "application/octet-stream".
    *
-   * @param body the body of response (Byte array)
+   * @param body the byte array representing the file or binary data (must not be null)
    */
   public void sendBinary(byte[] body) {
     contentType("application/octet-stream");
@@ -116,9 +126,10 @@ public class Response {
   }
 
   /**
-   * Send the body of the response (JSON String).
+   * Sends a JSON formatted string as the response payload, automatically setting the "Content-Type"
+   * to "application/json".
    *
-   * @param body the body of response (JSON)
+   * @param body the serialized JSON string (must not be null)
    */
   public void json(String body) {
     contentType("application/json");
@@ -126,9 +137,14 @@ public class Response {
   }
 
   /**
-   * Send the body of the response (HTML file).
+   * Streams a file from the server's disk to the client. Safely resolves paths to prevent directory
+   * traversal attacks (403 Forbidden). Automatically probes and sets the correct MIME type.
    *
-   * @param htmlPath the path of HTML file
+   * <p>{@code res.render("index.html");}
+   *
+   * @param htmlPath the relative path of the file within the configured static directory (must not
+   *     be null)
+   * @throws UncheckedIOException if an error occurs while accessing or streaming the file
    */
   public void render(String htmlPath) {
     Path filePath = Path.of(staticFilesPath, htmlPath).normalize();
@@ -162,9 +178,13 @@ public class Response {
   }
 
   /**
-   * Send the body of the response to the client.
+   * Transmits the final HTTP status line, headers, and body bytes to the client socket.
    *
-   * @param bodyBytes the body bytes
+   * <p>
+   *
+   * @implNote Flushes the stream immediately after writing. Subsequent calls to any send method
+   *     will be ignored.
+   * @param bodyBytes the complete raw payload (must not be null)
    */
   public void send(byte[] bodyBytes) {
     if (isSent) return;
