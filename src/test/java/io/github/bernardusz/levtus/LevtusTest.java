@@ -5,12 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 
 class LevtusTest {
 
-    @BeforeEach
-    void setUp() {
+  @BeforeEach
+  void setUp() {}
 
-      }
-
-    @AfterEach
-    void tearDown() {
-      }
+  @AfterEach
+  void tearDown() {}
 }

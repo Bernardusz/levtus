@@ -1,12 +1,10 @@
 package io.github.bernardusz.levtus.http;
 
 import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-
 import java.util.List;
 import java.util.Map;
 
@@ -20,11 +18,11 @@ public class Request {
   private final String method;
   private final String path;
   private final Map<String, List<String>> headers;
-  private final Map<String, String> queryParams;
+  private final Map<String, List<String>> queryParams;
   private final InputStream bodyStream;
+  private final int maxBodySize;
   private byte[] cachedBody;
   private int bytesRead;
-  private final int maxBodySize;
 
   /**
    * Initializes the internal state of an incoming request.
@@ -34,7 +32,7 @@ public class Request {
    * @param method the HTTP method (e.g., "GET", "POST") (must not be null)
    * @param path the requested URI path (must not be null)
    * @param headers a map of HTTP headers, where keys are strictly lowercase (must not be null)
-   * @param queryParams a map of parsed query string parameters (must not be null)
+   * @param queryParams a map of parsed query List of String parameters (must not be null)
    * @param bodyStream the raw input stream from the client socket (must not be null)
    * @param maxBodySize the configured absolute byte limit for the payload
    */
@@ -42,7 +40,7 @@ public class Request {
       String method,
       String path,
       Map<String, List<String>> headers,
-      Map<String, String> queryParams,
+      Map<String, List<String>> queryParams,
       InputStream bodyStream,
       int maxBodySize) {
     this.method = method;
@@ -83,17 +81,33 @@ public class Request {
   /**
    * Retrieves the complete map of parsed URL query parameters.
    *
+   * <p>{@code HashMap<String, List<String>> id = ctx.req().queryParams();}
+   *
    * @return a map of query parameters
    */
-  public Map<String, String> queryParams() {
-    return queryParams;
+  public Map<String, List<String>> queryParams() {
+    return queryParams != null ? queryParams : Map.of();
+  }
+
+  /**
+   * Retrieves the value - a List of String - of a specific query parameter by its key.
+   *
+   * <p>{@code ArrayList<String> tag = ctx.req().query("tag");}
+   *
+   * <p>{@code String id = ctx.req().query("id").getFirst();}
+   *
+   * @param key the query parameter name (must not be null)
+   * @return the associated value, or an empty List if the key does not exist
+   */
+  public List<String> query(String key) {
+    return queryParams.getOrDefault(key, List.of());
   }
 
   /**
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = req.getHeaders("Accept");}
+   * <p>{@code List<String> accepts = ctx.req().getHeaders("Accept");}
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -148,18 +162,6 @@ public class Request {
   }
 
   /**
-   * Retrieves the value of a specific query parameter by its key.
-   *
-   * <p>{@code String id = req.query("id");}
-   *
-   * @param key the query parameter name (must not be null)
-   * @return the associated value, or an empty string if the key does not exist
-   */
-  public String query(String key) {
-    return queryParams.getOrDefault(key, "");
-  }
-
-  /**
    * Checks whether the request body has already been fully read and stored in memory.
    *
    * @return {@code true} if the body is cached, {@code false} otherwise
@@ -178,7 +180,9 @@ public class Request {
    * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
    */
   public byte[] body() {
-    if (cachedBody != null) return cachedBody;
+    if (cachedBody != null) {
+      return cachedBody;
+    }
     try {
       if (contentLength() > maxBodySize) {
         throw new PayloadTooLargeException("Request body is too large");
