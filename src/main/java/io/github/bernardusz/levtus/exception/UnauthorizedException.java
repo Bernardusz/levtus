@@ -1,14 +1,15 @@
 package io.github.bernardusz.levtus.exception;
 
-/** Exception thrown when client sends an unauthorized request.
+/**
+ * Exception thrown when client sends an unauthorized request.
  *
- * <p>Results in an HTTP {@code 401 Unauthorized} response.</p>
- *
- * Extended from: {@link LevtusHttpException}
+ * <p>Results in an HTTP {@code 401 Unauthorized} response. Extended from: {@link
+ * LevtusHttpException}
  */
 public class UnauthorizedException extends LevtusHttpException {
   /**
-   * Constructs a new {@code UnauthorizedException} with the specified message and the status code of 401.
+   * Constructs a new {@code UnauthorizedException} with the specified message and the status code
+   * of 401.
    *
    * @param message the detail message explaining the error
    */

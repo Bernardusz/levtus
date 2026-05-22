@@ -34,7 +34,8 @@ public class Node {
    * The functional handler associated with this node. If non-null, this node represents a terminal
    * point of a registered route.
    *
-   * <p>TLDR: The handler/lambda that takes LevtusContext and is the function that is called when a route is matched.</p>
+   * <p>TLDR: The handler/lambda that takes LevtusContext and is the function that is called when a
+   * route is matched.
    */
   Consumer<LevtusContext> handler;
 

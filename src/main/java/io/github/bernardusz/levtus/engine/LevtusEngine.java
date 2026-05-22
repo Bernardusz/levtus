@@ -10,7 +10,6 @@ import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.security.SecurityConfig;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -18,16 +17,13 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
-
 import java.nio.charset.StandardCharsets;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -204,7 +200,9 @@ public class LevtusEngine {
       }
     }
 
-    if (requestLine == null) return null;
+    if (requestLine == null) {
+      return null;
+    }
 
     String[] parts = requestLine.split(" ", 3);
     if (parts.length < 2) {
@@ -241,21 +239,22 @@ public class LevtusEngine {
     }
 
     // Parse the Body
-    int contentLength;
+    int contentLength = 0;
     List<String> lengthStrList =
         headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
     if (lengthStrList.size() > 1) {
       throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
     }
     String lengthStr = lengthStrList.getFirst();
-    if (!lengthStr.isEmpty()) {
+    if (lengthStr != null && !lengthStr.isEmpty()) {
       try {
         contentLength = Integer.parseInt(lengthStr);
         if (contentLength > maxBodySize) {
           throw new PayloadTooLargeException(
               "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
         }
-      } catch (NumberFormatException _) {
+      } catch (NumberFormatException e) {
+        // Ignore invalid content-length
       }
     }
 
@@ -265,12 +264,8 @@ public class LevtusEngine {
 
     if (rawPath.startsWith("http")) {
       rawPath = rawPath.substring(rawPath.indexOf("//") + 2); // Strip until the https/http
-      rawPath =
-          rawPath.substring(
-              !rawPath.contains("/")
-                  ? 0
-                  : rawPath.indexOf("/")); // with http:// or https://, it includes the full domain.
-      // So the first / is the domain name
+      // Strip domain name
+      rawPath = rawPath.substring(!rawPath.contains("/") ? 0 : rawPath.indexOf("/"));
       if (rawPath.equals("/") || rawPath.isEmpty()) {
         rawPath = "/";
       }
@@ -279,7 +274,7 @@ public class LevtusEngine {
       rawPath = "/";
     }
 
-    Map<String, String> queryParams = new HashMap<>();
+    Map<String, List<String>> queryParams = new HashMap<>();
     if (rawPath.contains("?")) {
       int queryStart = rawPath.indexOf("?");
       path = rawPath.substring(0, queryStart);
@@ -288,9 +283,11 @@ public class LevtusEngine {
       for (String query : queryString.split("&")) {
         String[] pair = query.split("=", 2);
         if (pair.length == 2) {
-          queryParams.put(utf8Decoder(pair[0]), utf8Decoder(pair[1]));
+          queryParams
+              .computeIfAbsent(utf8Decoder(pair[0]), k -> new ArrayList<>())
+              .add(utf8Decoder(pair[1]));
         } else if (pair.length >= 1 && !pair[0].isEmpty()) {
-          queryParams.put(utf8Decoder(pair[0]), "");
+          queryParams.computeIfAbsent(utf8Decoder(pair[0]), k -> new ArrayList<>()).add("");
         }
       }
     } else {

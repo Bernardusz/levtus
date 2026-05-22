@@ -9,29 +9,31 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/** The Router for storing routes (and their handler) and handling requests.
+/**
+ * The Router for storing routes (and their handler) and handling requests.
  *
  * <p>Router is responsible for:
+ *
  * <ul>
- *   <li>Storing routes (and their handler) as Nodes in a Prefix Tree (Trie) {@link Router#root}</li>
- *   <li>Executing the middleware chain {@link Router#executeChain(LevtusContext, Consumer)}</li>
- *   <li>Executing the route handler {@link Router#handle(LevtusContext)}</li>
+ *   <li>Storing routes (and their handler) as Nodes in a Prefix Tree (Trie) {@link Router#root}
+ *   <li>Executing the middleware chain {@link Router#executeChain(LevtusContext, Consumer)}
+ *   <li>Executing the route handler {@link Router#handle(LevtusContext)}
  * </ul>
  *
- * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the appropriate handlers.</p>
- *
- * */
+ * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the
+ * appropriate handlers.
+ */
 public class Router {
   /** The global CopyOnWriteArrayList of middleware that is executed before the route handler. */
   private final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
 
-  /** The root node of the Prefix Tree (Trie) that stores the routes.
+  /**
+   * The root node of the Prefix Tree (Trie) that stores the routes.
    *
-   * <p>Inside this Node is a Trie structure, that stores the routes.</p>
+   * <p>Inside this Node is a Trie structure, that stores the routes.
    *
-   * <p>TLDR: The root node is the starting point of the Trie structure that stores the routes.</p>
-   *
-   * */
+   * <p>TLDR: The root node is the starting point of the Trie structure that stores the routes.
+   */
   private final Node root = new Node();
 
   /**
@@ -65,7 +67,8 @@ public class Router {
   }
 
   /**
-   * The method that handles the request by matching the route and executing the middleware chain first before the route handler.
+   * The method that handles the request by matching the route and executing the middleware chain
+   * first before the route handler.
    *
    * @param ctx the {@link LevtusContext} containing the request and response objects
    */
@@ -105,17 +108,21 @@ public class Router {
   }
 
   /**
-   * The method that builds the chain of execution, going from the router handler to last middleware to the first middleware.
+   * The method that builds the chain of execution, going from the router handler to last middleware
+   * to the first middleware.
    *
-   * <p>Explanation:</p>
+   * <p>Explanation:
+   *
    * <ul>
-   *   <li>Creates a {@link Runnable} that represents the final handler</li>
-   *   <li>Iterates over the global middleware in reverse order</li>
-   *   <li>For each middleware, creates a new {@link Runnable} that calls the middleware with the next step</li>
-   *   <li>Finally, calls the {@link Runnable} that represents the final handler</li>
+   *   <li>Creates a {@link Runnable} that represents the final handler
+   *   <li>Iterates over the global middleware in reverse order
+   *   <li>For each middleware, creates a new {@link Runnable} that calls the middleware with the
+   *       next step
+   *   <li>Finally, calls the {@link Runnable} that represents the final handler
    * </ul>
    *
-   * <p>TLDR: The method that builds the chain of execution, going from the router handler to last middleware to the first middleware before executing them.</p>
+   * <p>TLDR: The method that builds the chain of execution, going from the router handler to last
+   * middleware to the first middleware before executing them.
    *
    * @param ctx The {@link LevtusContext} containing the request and response objects
    * @param finalHandler The terminal route handler to be executed at the end of the chain
@@ -139,7 +146,7 @@ public class Router {
   /**
    * A shortcut for adding a GET route.
    *
-   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}
    *
    * @param path the path
    * @param handler the handler
@@ -151,7 +158,7 @@ public class Router {
   /**
    * A shortcut for adding a POST route.
    *
-   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}
    *
    * @param path the path
    * @param handler the handler
@@ -163,7 +170,7 @@ public class Router {
   /**
    * A shortcut for adding a PUT route.
    *
-   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}
    *
    * @param path the path
    * @param handler the handler
@@ -175,7 +182,7 @@ public class Router {
   /**
    * A shortcut for adding a DELETE route.
    *
-   * <p>Reference: {@link #addRoute(String, String, Consumer)}</p>
+   * <p>Reference: {@link #addRoute(String, String, Consumer)}
    *
    * @param path the path
    * @param handler the handler

@@ -1,5 +1,6 @@
 package io.github.bernardusz.levtus.http;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,17 +79,42 @@ public class LevtusContext {
    * @return the parameter value, or an empty string if not found
    */
   public String param(String name) {
-    return pathParams != null ? pathParams.getOrDefault(name, "") : "";
+    return pathParams.getOrDefault(name, "");
   }
 
   /**
-   * Retrieves the value of a specific query parameter by its name.
+   * Retrieves all the value of path parameters (wildcard).
+   *
+   * <p>{@code HashMap<String, String> params = ctx.params();}
+   *
+   * @return the map
+   */
+  public Map<String, String> params() {
+    return pathParams != null ? pathParams : Map.of();
+  }
+
+  /**
+   * Retrieves the value - a List of String - of a specific query parameter by its key.
+   *
+   * <p>{@code ArrayList<String> tag = ctx.query("tag");}</p>
+   * <p>{@code String id = ctx.query("id").getFirst();}</p>
    *
    * @param name the name of the query parameter
    * @return the query parameter value, or an empty string if not found
    */
-  public String query(String name) {
+  public List<String> query(String name) {
     return req.query(name);
+  }
+
+  /**
+   * Retrieves the complete map of parsed URL query parameters.
+   *
+   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queryParams();}</p>
+   *
+   * @return a map of query parameters
+   */
+  public Map<String, List<String>> queryParams() {
+    return req.queryParams();
   }
 
   /**

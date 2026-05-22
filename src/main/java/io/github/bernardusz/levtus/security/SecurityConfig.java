@@ -11,11 +11,12 @@ import javax.net.ssl.SSLContext;
 /**
  * Configuration for the server's security layer, specifically SSL/TLS settings.
  *
- * <p>This record manages the loading of cryptographic keys and the instantiation of the
- * {@link ServerSocket}. It supports both standard HTTP and secure HTTPS connections depending on
- * whether keystore information is provided.
+ * <p>This record manages the loading of cryptographic keys and the instantiation of the {@link
+ * ServerSocket}. It supports both standard HTTP and secure HTTPS connections depending on whether
+ * keystore information is provided.
  *
- * @param keystorePath the file system path to the .p12 (PKCS12) keystore file; if null, SSL is disabled
+ * @param keystorePath the file system path to the .p12 (PKCS12) keystore file; if null, SSL is
+ *     disabled
  * @param keystorePass the password required to unlock and read the keystore file
  */
 public record SecurityConfig(String keystorePath, String keystorePass) {
@@ -36,7 +37,8 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
    *
    * @param port the TCP port to bind the server socket to
    * @return a configured ServerSocket (secure or non-secure)
-   * @throws RuntimeException if the keystore cannot be loaded or the SSL context fails to initialize
+   * @throws RuntimeException if the keystore cannot be loaded or the SSL context fails to
+   *     initialize
    */
   public ServerSocket getServerSocket(int port) {
     try {

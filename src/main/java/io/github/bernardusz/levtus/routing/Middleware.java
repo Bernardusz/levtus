@@ -10,15 +10,17 @@ import io.github.bernardusz.levtus.http.LevtusContext;
  * concerns such as logging, authentication, compression, or header manipulation.
  *
  * <p>Each middleware has the choice to:
+ *
  * <ul>
- *   <li>Examine or modify the request/response and then pass control to the next handler by
- *       calling {@code next.run()}.</li>
+ *   <li>Examine or modify the request/response and then pass control to the next handler by calling
+ *       {@code next.run()}.
  *   <li>Short-circuit the request by sending a response directly and <b>not</b> calling {@code
- *       next.run()}.</li>
- *   <li>Execution link: {@link Router#handle(LevtusContext)}</li>
+ *       next.run()}.
+ *   <li>Execution link: {@link Router#handle(LevtusContext)}
  * </ul>
  *
  * <p>Example usage:
+ *
  * <pre>{@code
  * app.use((ctx, next) -> {
  *     long start = System.currentTimeMillis();

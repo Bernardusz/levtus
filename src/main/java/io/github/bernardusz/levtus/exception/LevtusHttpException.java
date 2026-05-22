@@ -3,8 +3,8 @@ package io.github.bernardusz.levtus.exception;
 /**
  * Base exception class for all HTTP-related errors in the Levtus engine.
  *
- * <p>This exception carries an HTTP status code that will be sent back to the client
- * when the exception is caught by the {@link io.github.bernardusz.levtus.engine.LevtusEngine}.
+ * <p>This exception carries an HTTP status code that will be sent back to the client when the
+ * exception is caught by the {@link io.github.bernardusz.levtus.engine.LevtusEngine}.
  *
  * @author Bernardusz
  * @version 1.0
