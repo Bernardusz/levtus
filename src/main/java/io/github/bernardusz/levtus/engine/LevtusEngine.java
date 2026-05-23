@@ -1,10 +1,6 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
-import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
 import io.github.bernardusz.levtus.exception.LevtusHttpException;
-import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
@@ -12,22 +8,13 @@ import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.security.SecurityConfig;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -41,6 +28,7 @@ import java.util.concurrent.Semaphore;
 public class LevtusEngine {
   private final Router router;
   private volatile SecurityConfig securityConfig;
+  private final HttpParser parser;
   private int maxConcurrentConnections = 10000;
   private int maxEmptyLines = 10;
   private int maxBodySize = 10 * 1024 * 1024;
@@ -57,12 +45,13 @@ public class LevtusEngine {
   public LevtusEngine(Router router) {
     this.router = router;
     this.securityConfig = new SecurityConfig(null, null);
+    this.parser = new HttpParser();
   }
 
   /**
    * Starts the Levtus engine based on the provided port.
    *
-   * Will start on HTTP by default, unless SSL is configured via {@link #ssl(String, String)}.
+   * <p>Will start on HTTP by default, unless SSL is configured via {@link #ssl(String, String)}.</p>
    *
    * @param port the port
    */
@@ -128,7 +117,7 @@ public class LevtusEngine {
 
       try {
         Request req;
-        while ((req = parseRequest(inputStream)) != null) {
+        while ((req = parser.parseRequest(this, inputStream)) != null) {
           res = new Response(outputStream, staticFilesPath);
           LevtusContext ctx = new LevtusContext(req, res);
           client.setSoTimeout(20000);
@@ -162,158 +151,15 @@ public class LevtusEngine {
   }
 
   /**
-   * Responsible for parsing the request from the client socket.
-   *
-   * <p>Parses:</p>
-   * <ul>
-   * <li>Request line</li>
-   * <li>Headers</li>
-   * <li>Body</li>
-   * </ul>
-   * Immediately throws an Exception if:
-   * <ul>
-   * <li>Request line is invalid</li>
-   * <li>Headers are invalid</li>
-   * <li>Body is invalid</li>
-   * </ul>
-   *
-   * <p>Without waiting for all of them; one problem, Exception is thrown</p>
-   *
-   * @param inputStream The stream to read the HTTP request from
-   * @return {@link Request} A fully parsed Request object, or null if the stream is empty
-   * @throws IOException If a network or stream error occurs
-   * @throws URISyntaxException If the request line is invalid
-   * @throws BadRequestException If the request line is invalid or headers are malformed
-   * @throws PayloadTooLargeException If the request's body size exceeds {@link #maxBodySize}, set via {@link #setMaxBodySize(int)}
-   * @throws HeaderTooLargeException If the header's total size exceeds {@link #maxHeaderSize}, set via {@link #setMaxHeaderSize(int)}
-   * @throws LevtusNotImplementedException If the method is not implemented.
-   */
-  private Request parseRequest(InputStream inputStream) throws IOException, URISyntaxException {
-    String requestLine;
-
-    // Read the request line
-    int b = 0;
-    while ((requestLine = readLine(inputStream)) != null && requestLine.isEmpty()) {
-      b++;
-      if (b > maxEmptyLines) {
-        throw new BadRequestException("400 - Bad Request (Request too large)");
-      }
-    }
-
-    if (requestLine == null) {
-      return null;
-    }
-
-    String[] parts = requestLine.split(" ", 3);
-    if (parts.length < 2) {
-      throw new BadRequestException("400 - Bad Request");
-    }
-
-    String method = parts[0];
-
-    // Parse the Header
-    String header;
-    int totalHeaderSize = 0;
-    Map<String, List<String>> headers = new HashMap<>();
-    while ((header = readLine(inputStream)) != null && !(header.isEmpty())) {
-      totalHeaderSize += header.length();
-      if (totalHeaderSize > maxHeaderSize) {
-        throw new HeaderTooLargeException("Header too large");
-      }
-      if (headers.size() > maxHeaderCount) {
-        throw new HeaderTooLargeException("Too many headers");
-      }
-
-      String[] headerParts = header.split(":", 2);
-      if (headerParts.length == 2) {
-        headers
-            .computeIfAbsent(headerParts[0].toLowerCase().trim(), k -> new ArrayList<>())
-            .add(headerParts[1].trim());
-      }
-    }
-    if (headers.get("host") == null) {
-      throw new BadRequestException("400 - Bad Request (Missing host header)");
-    }
-    if (headers.get("transfer-encoding") != null) {
-      throw new LevtusNotImplementedException(headers.get("transfer-encoding").getFirst());
-    }
-
-    // Parse the Body
-    int contentLength = 0;
-    List<String> lengthStrList =
-        headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
-    if (lengthStrList.size() > 1) {
-      throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
-    }
-    String lengthStr = lengthStrList.getFirst();
-    if (lengthStr != null && !lengthStr.isEmpty()) {
-      try {
-        contentLength = Integer.parseInt(lengthStr);
-        if (contentLength > maxBodySize) {
-          throw new PayloadTooLargeException(
-              "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
-        }
-      } catch (NumberFormatException e) {
-        // Ignore invalid content-length
-      }
-    }
-
-    // Parse the Path
-    String rawPath = parts[1];
-    String path;
-
-    if (rawPath.startsWith("http")) {
-      rawPath = rawPath.substring(rawPath.indexOf("//") + 2); // Strip until the https/http
-      // Strip domain name
-      rawPath = rawPath.substring(!rawPath.contains("/") ? 0 : rawPath.indexOf("/"));
-      if (rawPath.equals("/") || rawPath.isEmpty()) {
-        rawPath = "/";
-      }
-    }
-    if (!rawPath.contains("/")) {
-      rawPath = "/";
-    }
-
-    Map<String, List<String>> queryParams = new HashMap<>();
-    if (rawPath.contains("?")) {
-      int queryStart = rawPath.indexOf("?");
-      path = rawPath.substring(0, queryStart);
-      String queryString = rawPath.substring(queryStart + 1);
-
-      for (String query : queryString.split("&")) {
-        String[] pair = query.split("=", 2);
-        if (pair.length == 2) {
-          queryParams
-              .computeIfAbsent(utf8Decoder(pair[0]), k -> new ArrayList<>())
-              .add(utf8Decoder(pair[1]));
-        } else if (pair.length >= 1 && !pair[0].isEmpty()) {
-          queryParams.computeIfAbsent(utf8Decoder(pair[0]), k -> new ArrayList<>()).add("");
-        }
-      }
-    } else {
-      path = rawPath;
-    }
-
-    URI uri;
-    String newPath;
-    try {
-      uri = new URI(path).normalize();
-      // Now after http is gone, we need to fix every instance of double and trailing slashes
-      newPath = (uri.toString()).replaceAll("/{2,}", "/");
-    } catch (URISyntaxException e) {
-      throw new BadRequestException("400 - Bad Request");
-    }
-    return new Request(
-        method, new URI(newPath).getRawPath(), headers, queryParams, inputStream, maxBodySize);
-  }
-
-  /**
    * Sets max concurrent connections for the server.
    *
    * @param maxConcurrentConnections the max concurrent connections
    */
   public void setMaxConcurrentConnections(int maxConcurrentConnections) {
     this.maxConcurrentConnections = maxConcurrentConnections;
+  }
+  int getMaxConcurrentConnections(){
+    return maxConcurrentConnections;
   }
 
   /**
@@ -324,6 +170,9 @@ public class LevtusEngine {
   public void setMaxEmptyLines(int maxEmptyLines) {
     this.maxEmptyLines = maxEmptyLines;
   }
+  int getMaxEmptyLines(){
+    return maxEmptyLines;
+  }
 
   /**
    * Sets the global max body size for all incoming requests.
@@ -332,6 +181,9 @@ public class LevtusEngine {
    */
   public void setMaxBodySize(int maxBodySize) {
     this.maxBodySize = maxBodySize;
+  }
+  int getMaxBodySize(){
+    return maxBodySize;
   }
 
   /**
@@ -342,6 +194,9 @@ public class LevtusEngine {
   public void setMaxHeaderCount(int maxHeaderCount) {
     this.maxHeaderCount = maxHeaderCount;
   }
+  int getMaxHeaderCount(){
+    return maxHeaderCount;
+  }
 
   /**
    * Sets the global max size of a line for all incoming requests.
@@ -350,6 +205,9 @@ public class LevtusEngine {
    */
   public void setMaxLineSize(int maxLineSize) {
     this.maxLineSize = maxLineSize;
+  }
+  int getMaxLineSize(){
+    return maxLineSize;
   }
 
   /**
@@ -360,35 +218,19 @@ public class LevtusEngine {
   public void setMaxHeaderSize(int maxHeaderSize) {
     this.maxHeaderSize = maxHeaderSize;
   }
+  int getMaxHeaderSize(){
+    return maxHeaderSize;
+  }
 
   /**
    * Sets the path/directory in which all static files are set.
    *
-   * Default to {@link #staticFilesPath}
+   * <p>Default to {@link #staticFilesPath}</p>
    *
    * @param staticFilesPath the static files path
    */
   public void setStaticFiles(String staticFilesPath) {
     this.staticFilesPath = staticFilesPath;
-  }
-
-  private String readLine(InputStream inputStream) throws IOException {
-    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    int b;
-    int count = 0;
-    while ((b = inputStream.read()) != -1) {
-      if (b == '\n') break;
-      if (b == '\r') continue;
-
-      buffer.write(b);
-      count++;
-
-      if (count > maxLineSize) {
-        throw new HeaderTooLargeException("HTTP Header line too long (Limit: " + maxLineSize + ")");
-      }
-    }
-    if (b == -1) return null;
-    return buffer.toString(StandardCharsets.UTF_8);
   }
 
   private void sendOverloadedResponse(Socket client) {
@@ -408,9 +250,5 @@ public class LevtusEngine {
     } catch (IOException e) {
       // If the client already disconnected, just ignore it
     }
-  }
-
-  private String utf8Decoder(String body) throws IllegalArgumentException {
-    return URLDecoder.decode(body, StandardCharsets.UTF_8);
   }
 }
