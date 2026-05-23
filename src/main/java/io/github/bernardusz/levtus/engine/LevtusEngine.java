@@ -27,8 +27,8 @@ import java.util.concurrent.Semaphore;
  */
 public class LevtusEngine {
   private final Router router;
-  private volatile SecurityConfig securityConfig;
   private final HttpParser parser;
+  private volatile SecurityConfig securityConfig;
   private int maxConcurrentConnections = 10000;
   private int maxEmptyLines = 10;
   private int maxBodySize = 10 * 1024 * 1024;
@@ -151,6 +151,15 @@ public class LevtusEngine {
   }
 
   /**
+   * Get max concurrent connections for the server.
+   *
+   * @return the max concurrent connections
+   */
+  int getMaxConcurrentConnections(){
+    return maxConcurrentConnections;
+  }
+
+  /**
    * Sets max concurrent connections for the server.
    *
    * @param maxConcurrentConnections the max concurrent connections
@@ -158,8 +167,14 @@ public class LevtusEngine {
   public void setMaxConcurrentConnections(int maxConcurrentConnections) {
     this.maxConcurrentConnections = maxConcurrentConnections;
   }
-  int getMaxConcurrentConnections(){
-    return maxConcurrentConnections;
+
+  /**
+   * Get the max empty lines in the request for Keep-Alive connection.
+   *
+   * @return return the max empty lines in a request
+   */
+  int getMaxEmptyLines(){
+    return maxEmptyLines;
   }
 
   /**
@@ -170,8 +185,14 @@ public class LevtusEngine {
   public void setMaxEmptyLines(int maxEmptyLines) {
     this.maxEmptyLines = maxEmptyLines;
   }
-  int getMaxEmptyLines(){
-    return maxEmptyLines;
+
+  /**
+   * Get the global max body size for all incoming requests.
+   *
+   * @return return the max body size in a request
+   */
+  int getMaxBodySize(){
+    return maxBodySize;
   }
 
   /**
@@ -182,8 +203,14 @@ public class LevtusEngine {
   public void setMaxBodySize(int maxBodySize) {
     this.maxBodySize = maxBodySize;
   }
-  int getMaxBodySize(){
-    return maxBodySize;
+
+  /**
+   * Get the global max header count for all incoming requests.
+   *
+   * @return return the max header count in a request
+   */
+  int getMaxHeaderCount(){
+    return maxHeaderCount;
   }
 
   /**
@@ -194,8 +221,14 @@ public class LevtusEngine {
   public void setMaxHeaderCount(int maxHeaderCount) {
     this.maxHeaderCount = maxHeaderCount;
   }
-  int getMaxHeaderCount(){
-    return maxHeaderCount;
+
+  /**
+   * Get the global max size of a line for all incoming requests.
+   *
+   * @return return the max size per line of a request
+   */
+  int getMaxLineSize(){
+    return maxLineSize;
   }
 
   /**
@@ -206,8 +239,14 @@ public class LevtusEngine {
   public void setMaxLineSize(int maxLineSize) {
     this.maxLineSize = maxLineSize;
   }
-  int getMaxLineSize(){
-    return maxLineSize;
+
+  /**
+   * Get the max header size for all incoming requests.
+   *
+   * @return return the max header size for all incoming requests
+   */
+  int getMaxHeaderSize(){
+    return maxHeaderSize;
   }
 
   /**
@@ -217,9 +256,6 @@ public class LevtusEngine {
    */
   public void setMaxHeaderSize(int maxHeaderSize) {
     this.maxHeaderSize = maxHeaderSize;
-  }
-  int getMaxHeaderSize(){
-    return maxHeaderSize;
   }
 
   /**
@@ -233,6 +269,14 @@ public class LevtusEngine {
     this.staticFilesPath = staticFilesPath;
   }
 
+  /**
+   * The helper method to send a 503 Service Unavailable response.
+   *
+   * <p>When the server is overloaded by request (Semaphore is full) this helper method will be called</p>
+   * <p>It will send 503 immediately on the Main Thread to sever connection immediately</p>
+   *
+   * @param client The socket client
+   */
   private void sendOverloadedResponse(Socket client) {
     try (client; // This ensures the socket closes after the try block
         OutputStream out = client.getOutputStream()) {
