@@ -193,21 +193,25 @@ public class LevtusEngine {
     String path;
 
     if (rawPath.startsWith("http")) {
-      rawPath = rawPath.substring(rawPath.indexOf("//") + 2); // Strip until the https/http
-      rawPath =
-          rawPath.substring(
-              !rawPath.contains("/")
-                  ? 0
-                  : rawPath.indexOf("/")); // with http:// or https://, it includes the full domain.
-      // So the first / is the domain name
+      // Strip scheme (http:// or https://)
+      rawPath = rawPath.substring(rawPath.indexOf("//") + 2);
+      // Strip domain name, keep path
+      rawPath = rawPath.substring(!rawPath.contains("/") ? 0 : rawPath.indexOf("/"));
       if (rawPath.equals("/") || rawPath.isEmpty()) {
+        rawPath = "/";
+      }
+    } else if (!rawPath.startsWith("/") && !rawPath.equals("*")) {
+      // FIX: Handle authority-form without scheme (e.g. "start.levtus.io/path")
+      // Strip the host/authority part and keep only the path
+      if (rawPath.contains("/")) {
+        rawPath = rawPath.substring(rawPath.indexOf("/"));
+      } else {
         rawPath = "/";
       }
     }
     if (!rawPath.contains("/")) {
       rawPath = "/";
     }
-
     Map<String, String> queryParams = new HashMap<>();
     if (rawPath.contains("?")) {
       int queryStart = rawPath.indexOf("?");
