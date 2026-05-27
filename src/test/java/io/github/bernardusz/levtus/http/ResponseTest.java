@@ -5,23 +5,67 @@ import static org.mockito.Mockito.*;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ResponseTest {
 
   private BufferedOutputStream mockOutput;
   private Response response;
 
+  @TempDir
+  Path tempDir;
+
   @BeforeEach
   void setUp() {
     mockOutput = mock(BufferedOutputStream.class);
-    response = new Response(mockOutput, "./public");
+    response = new Response(mockOutput, tempDir.toString());
   }
 
   @Test
   void testInitialState() {
     assertFalse(response.isSent());
+  }
+
+  @Test
+  void testRenderSuccessful() throws IOException {
+    Path testFile = tempDir.resolve("index.html");
+    Files.writeString(testFile, "<h1>Hello</h1>");
+
+    response.render("index.html");
+
+    assertTrue(response.isSent());
+    verify(mockOutput, atLeastOnce()).write(any(byte[].class));
+  }
+
+  @Test
+  void testRenderNotFound() throws IOException {
+    response.render("missing.html");
+
+    assertTrue(response.isSent());
+    // Should have sent 404
+    verify(mockOutput, atLeastOnce()).write(containsBytes("404 Not Found"));
+  }
+
+  @Test
+  void testRenderPathTraversalProtection() throws IOException {
+    // Create a file outside the static directory
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.txt");
+    Files.writeString(secretFile, "sensitive data");
+
+    // Try to access it via traversal
+    response.render("../secret.txt");
+
+    // Should have sent 403 Forbidden
+    verify(mockOutput, atLeastOnce()).write(containsBytes("403 Forbidden"));
+  }
+
+  private byte[] containsBytes(String str) {
+      return argThat(bytes -> new String(bytes).contains(str));
   }
 
   @Test

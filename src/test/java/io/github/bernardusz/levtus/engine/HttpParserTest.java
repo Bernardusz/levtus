@@ -24,7 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class HttpParserTest {
-  @Mock private LevtusEngine mockEngine;
+  @Mock private HttpConnectionHandler mockHandler;
 
   private HttpParser parser;
 
@@ -361,13 +361,13 @@ class HttpParserTest {
     InputStream inputStream =
         new ByteArrayInputStream(fullRequest.getBytes(StandardCharsets.UTF_8));
 
-    when(mockEngine.getMaxLineSize()).thenReturn(8192);
-    when(mockEngine.getMaxEmptyLines()).thenReturn(10);
-    when(mockEngine.getMaxHeaderSize()).thenReturn(8192);
-    when(mockEngine.getMaxHeaderCount()).thenReturn(100);
-    when(mockEngine.getMaxBodySize()).thenReturn(1024);
+    when(mockHandler.getMaxLineSize()).thenReturn(8192);
+    when(mockHandler.getMaxEmptyLines()).thenReturn(10);
+    when(mockHandler.getMaxHeaderSize()).thenReturn(8192);
+    when(mockHandler.getMaxHeaderCount()).thenReturn(100);
+    when(mockHandler.getMaxBodySize()).thenReturn(1024);
 
-    Request request = parser.parseRequest(mockEngine, inputStream);
+    Request request = parser.parseRequest(mockHandler, inputStream);
 
     assertNotNull(request);
     assertEquals("GET", request.method());

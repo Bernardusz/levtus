@@ -25,7 +25,7 @@ import java.util.function.Consumer;
  */
 public class Router {
   /** The global CopyOnWriteArrayList of middleware that is executed before the route handler. */
-  private final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
+  final List<Middleware> globalMiddleware = new CopyOnWriteArrayList<>();
 
   /**
    * The root node of the Prefix Tree (Trie) that stores the routes.
@@ -34,7 +34,7 @@ public class Router {
    *
    * <p>TLDR: The root node is the starting point of the Trie structure that stores the routes.
    */
-  private final Node root = new Node();
+  final Node root = new Node();
 
   /**
    * The method that stores the route in the Trie structure.
@@ -127,7 +127,7 @@ public class Router {
    * @param ctx The {@link LevtusContext} containing the request and response objects
    * @param finalHandler The terminal route handler to be executed at the end of the chain
    */
-  private void executeChain(LevtusContext ctx, Consumer<LevtusContext> finalHandler) {
+  void executeChain(LevtusContext ctx, Consumer<LevtusContext> finalHandler) {
     Runnable current = () -> finalHandler.accept(ctx);
 
     for (int i = globalMiddleware.size() - 1; i >= 0; i--) {
@@ -139,7 +139,7 @@ public class Router {
     current.run();
   }
 
-  private String utf8Decoder(String body) throws IllegalArgumentException {
+  String utf8Decoder(String body) throws IllegalArgumentException {
     return URLDecoder.decode(body, StandardCharsets.UTF_8);
   }
 
