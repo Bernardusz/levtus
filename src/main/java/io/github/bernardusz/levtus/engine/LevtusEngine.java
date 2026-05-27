@@ -1,19 +1,11 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.LevtusHttpException;
-import io.github.bernardusz.levtus.http.LevtusContext;
-import io.github.bernardusz.levtus.http.Request;
-import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.security.SecurityConfig;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,16 +18,11 @@ import java.util.concurrent.Semaphore;
  * @version 0.1.1
  */
 public class LevtusEngine {
-  private final Router router;
-  private final HttpParser parser;
-  private volatile SecurityConfig securityConfig;
-  private int maxConcurrentConnections = 10000;
-  private int maxEmptyLines = 10;
-  private int maxBodySize = 10 * 1024 * 1024;
-  private int maxHeaderCount = 100;
-  private int maxLineSize = 8192; // 8 KB Limit
-  private int maxHeaderSize = 8192; // 8 KB Limit
-  private String staticFilesPath = "./public";
+  final HttpParser parser;
+  final HttpConnectionHandler handler;
+  volatile SecurityConfig securityConfig;
+  int maxConcurrentConnections = 10000;
+
 
   /**
    * Instantiates a new Levtus engine.
@@ -43,9 +30,9 @@ public class LevtusEngine {
    * @param router the router
    */
   public LevtusEngine(Router router) {
-    this.router = router;
     this.securityConfig = new SecurityConfig(null, null);
     this.parser = new HttpParser();
+    this.handler = new HttpConnectionHandler(router, parser);
   }
 
   /**
@@ -69,7 +56,7 @@ public class LevtusEngine {
           executor.submit(
               () -> {
                 try {
-                  handleConnection(client);
+                  handler.handle(client);
                 } finally {
                   semaphore.release();
                 }
@@ -93,62 +80,6 @@ public class LevtusEngine {
     this.securityConfig = new SecurityConfig(keystorePath, keystorePass);
   }
 
-  /**
-   * Handles the connection from a client.
-   *
-   * <p>Responsible for:</p>
-   * <ul>
-   * <li>Reading from the client socket</li>
-   * <li>Parsing incoming Request</li>
-   * <li>Instantiating Response and LevtusContext</li>
-   * <li>Passing the work to the router</li>
-   * <li>Sending the response</li>
-   * <li>Closing the client socket</li>
-   * </ul>
-   *
-   * @param client the client socket
-   */
-  private void handleConnection(Socket client) {
-    try (client;
-        BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
-      client.setSoTimeout(5000);
-      Response res = new Response(outputStream, staticFilesPath);
-
-      try {
-        Request req;
-        while ((req = parser.parseRequest(this, inputStream)) != null) {
-          res = new Response(outputStream, staticFilesPath);
-          LevtusContext ctx = new LevtusContext(req, res);
-          client.setSoTimeout(20000);
-          router.handle(ctx);
-          if (!res.isSent()) {
-            res.status(404).send("404 - Not Found");
-          }
-          try {
-            if (!req.isCached()) {
-              inputStream.skipNBytes(req.contentLength() - req.bytesRead());
-            }
-          } catch (EOFException e) {
-            break;
-          }
-        }
-      } catch (IllegalArgumentException e) {
-        res.status(400).send("400 - Bad Request (Malformed URL)");
-      } catch (LevtusHttpException e) {
-        res.status(e.getStatusCode()).send(e.getMessage());
-      } catch (SocketTimeoutException e) {
-        res.status(408).send("408 - Request Timeout");
-      } catch (Exception e) {
-        res.status(500).send("500 - Internal Server Error");
-        throw e;
-      }
-
-    } catch (Exception e) {
-      System.err.println("Connection failed: " + e.getMessage());
-      throw new RuntimeException(e);
-    }
-  }
 
   /**
    * Get max concurrent connections for the server.
@@ -174,7 +105,7 @@ public class LevtusEngine {
    * @return return the max empty lines in a request
    */
   int getMaxEmptyLines(){
-    return maxEmptyLines;
+    return handler.getMaxEmptyLines();
   }
 
   /**
@@ -183,7 +114,7 @@ public class LevtusEngine {
    * @param maxEmptyLines the max empty lines
    */
   public void setMaxEmptyLines(int maxEmptyLines) {
-    this.maxEmptyLines = maxEmptyLines;
+    handler.setMaxEmptyLines(maxEmptyLines);
   }
 
   /**
@@ -192,43 +123,43 @@ public class LevtusEngine {
    * @return return the max body size in a request
    */
   int getMaxBodySize(){
-    return maxBodySize;
+    return handler.getMaxBodySize();
   }
 
   /**
-   * Sets the global max body size for all incoming requests.
+   * Sets the global max body size for all incoming HTTP requests.
    *
    * @param maxBodySize the max body size
    */
   public void setMaxBodySize(int maxBodySize) {
-    this.maxBodySize = maxBodySize;
+    handler.setMaxBodySize(maxBodySize);
   }
 
   /**
-   * Get the global max header count for all incoming requests.
+   * Get the global max header count for all incoming HTTP requests.
    *
    * @return return the max header count in a request
    */
   int getMaxHeaderCount(){
-    return maxHeaderCount;
+    return handler.getMaxHeaderCount();
   }
 
   /**
-   * Sets the global max header count for all incoming requests.
+   * Sets the global max header count for all incoming HTTP requests.
    *
    * @param maxHeaderCount the max header count
    */
   public void setMaxHeaderCount(int maxHeaderCount) {
-    this.maxHeaderCount = maxHeaderCount;
+    handler.setMaxHeaderCount(maxHeaderCount);
   }
 
   /**
    * Get the global max size of a line for all incoming requests.
    *
-   * @return return the max size per line of a request
+   * @return return the max size per line of an HTTP request
    */
   int getMaxLineSize(){
-    return maxLineSize;
+    return handler.getMaxLineSize();
   }
 
   /**
@@ -237,36 +168,36 @@ public class LevtusEngine {
    * @param maxLineSize the max line size
    */
   public void setMaxLineSize(int maxLineSize) {
-    this.maxLineSize = maxLineSize;
+    handler.setMaxLineSize(maxLineSize);
   }
 
   /**
-   * Get the max header size for all incoming requests.
+   * Get the max header size for all incoming HTTP requests.
    *
    * @return return the max header size for all incoming requests
    */
   int getMaxHeaderSize(){
-    return maxHeaderSize;
+    return handler.getMaxHeaderSize();
   }
 
   /**
-   * Sets the max header size for all incoming requests.
+   * Sets the max header size for all incoming HTTP requests.
    *
    * @param maxHeaderSize the max header size
    */
   public void setMaxHeaderSize(int maxHeaderSize) {
-    this.maxHeaderSize = maxHeaderSize;
+    handler.setMaxHeaderSize(maxHeaderSize);
   }
 
   /**
    * Sets the path/directory in which all static files are set.
    *
-   * <p>Default to {@link #staticFilesPath}</p>
+   * <p>Default to "./public" in {@link HttpConnectionHandler}</p>
    *
    * @param staticFilesPath the static files path
    */
   public void setStaticFiles(String staticFilesPath) {
-    this.staticFilesPath = staticFilesPath;
+    handler.setStaticFiles(staticFilesPath);
   }
 
   /**
@@ -275,9 +206,10 @@ public class LevtusEngine {
    * <p>When the server is overloaded by request (Semaphore is full) this helper method will be called</p>
    * <p>It will send 503 immediately on the Main Thread to sever connection immediately</p>
    *
+   * Visible for testing
    * @param client The socket client
    */
-  private void sendOverloadedResponse(Socket client) {
+  void sendOverloadedResponse(Socket client) {
     try (client; // This ensures the socket closes after the try block
         OutputStream out = client.getOutputStream()) {
 
