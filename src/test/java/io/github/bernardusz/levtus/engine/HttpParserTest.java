@@ -52,7 +52,7 @@ class HttpParserTest {
     assertEquals("", line); // Empty string for a blank line (no newline - \n)
 
     String secondLine = parser.readLine(mockInputStream, 10);
-    assertEquals(null, secondLine); // null for end of stream
+    assertNull(secondLine); // null for end of stream
 
     InputStream mockInputStream2 = Mockito.mock(InputStream.class);
     Mockito.when(mockInputStream2.read()).thenReturn((int) 'G', 13, 10, -1);
@@ -85,16 +85,14 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseRequestLineTooLarge() throws IOException {
+  void testParseRequestLineTooLarge() {
     String requestLineKeepAlive = "GET / HTTP/1.1\r\n";
     InputStream stream =
         new ByteArrayInputStream(requestLineKeepAlive.getBytes(StandardCharsets.UTF_8));
 
     assertThrows(
         HeaderTooLargeException.class,
-        () -> {
-          parser.parseRequestLine(stream, 4, 10);
-        });
+        () -> parser.parseRequestLine(stream, 4, 10));
   }
 
   @Test
@@ -108,7 +106,7 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseRequestLineTooManyEmptyLines() throws IOException {
+  void testParseRequestLineTooManyEmptyLines() {
     String requestLineKeepAlive =
         "\r\n\r\n\r\n"
             + "\r\n"
@@ -129,9 +127,7 @@ class HttpParserTest {
 
     assertThrows(
         BadRequestException.class,
-        () -> {
-          String result = parser.parseRequestLine(mockInputStream, 25, 4);
-        });
+        () -> parser.parseRequestLine(mockInputStream, 25, 4));
   }
 
   @Test
@@ -145,9 +141,8 @@ class HttpParserTest {
   @Test
   void testParseMethodMoreThanThree() {
     String requestLine = "GET / HTTP/1.1 RANDOM THINGS";
-    String parsedMethod = parser.parseMethod(requestLine);
 
-    assertEquals("GET", parsedMethod);
+    assertThrows(BadRequestException.class, () -> parser.parseMethod(requestLine));
   }
 
   @Test
@@ -156,9 +151,7 @@ class HttpParserTest {
 
     assertThrows(
         BadRequestException.class,
-        () -> {
-          parser.parseMethod(badRequestLine);
-        });
+        () -> parser.parseMethod(badRequestLine));
   }
 
   @Test
@@ -181,13 +174,13 @@ class HttpParserTest {
         parser.parseHeaders(
             mockInputStream,
             8192,
-            20); // Max headers check how many key headers are there. Not the vakue itself.
+            20); // Max headers check how many key headers are there. Not the value itself.
     // Note: Create an issue later
     assertEquals(headers, parsedHeaders);
   }
 
   @Test
-  void testParseHeadersHeaderTooLarge() throws IOException {
+  void testParseHeadersHeaderTooLarge() {
     String requestLine =
         "Host: localhost:8080\r\n"
             + "User-Agent: Mozilla/5.0\r\n"
@@ -202,7 +195,7 @@ class HttpParserTest {
           parser.parseHeaders(
               mockInputStream,
               1,
-              20); // Max headers check how many key headers are there. Not the vakue itself.
+              20); // Max headers check how many key headers are there. Not the value itself.
         });
     assertThrows(
         HeaderTooLargeException.class,
@@ -210,13 +203,13 @@ class HttpParserTest {
           parser.parseHeaders(
               mockInputStream,
               8192,
-              1); // Max headers check how many key headers are there. Not the vakue itself.
+              1); // Max headers check how many key headers are there. Not the value itself.
         });
     // Note: Create an issue later
   }
 
   @Test
-  void testParseHeadersHeaderBadRequestMissingHost() throws IOException {
+  void testParseHeadersHeaderBadRequestMissingHost() {
     String requestLine = "User-Agent: Mozilla/5.0\r\n" + "Tag: Wonderful\r\n" + "Tag: Java\r\n\r\n";
     InputStream mockInputStream =
         new ByteArrayInputStream(requestLine.getBytes(StandardCharsets.UTF_8));
@@ -229,7 +222,7 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseHeadersHeaderNotImplemented() throws IOException {
+  void testParseHeadersHeaderNotImplemented() {
     String requestLine =
         "Host: localhost:8080\r\n"
             + "User-Agent: Mozilla/5.0\r\n"
@@ -241,9 +234,7 @@ class HttpParserTest {
 
     assertThrows(
         LevtusNotImplementedException.class,
-        () -> {
-          parser.parseHeaders(mockInputStream, 8192, 20);
-        });
+        () -> parser.parseHeaders(mockInputStream, 8192, 20));
   }
 
   @Test
@@ -256,9 +247,7 @@ class HttpParserTest {
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
     assertDoesNotThrow(
-        () -> {
-          parser.validateBodySize(headers, 10 * 1024 * 1024);
-        });
+        () -> parser.validateBodySize(headers, 10 * 1024 * 1024));
   }
 
   @Test
@@ -272,9 +261,7 @@ class HttpParserTest {
 
     assertThrows(
         BadRequestException.class,
-        () -> {
-          parser.validateBodySize(headers, 10 * 1024 * 1024);
-        });
+        () -> parser.validateBodySize(headers, 10 * 1024 * 1024));
   }
 
   @Test
@@ -288,9 +275,7 @@ class HttpParserTest {
 
     assertThrows(
         PayloadTooLargeException.class,
-        () -> {
-          parser.validateBodySize(headers, 10);
-        });
+        () -> parser.validateBodySize(headers, 10));
   }
 
   @Test
@@ -304,19 +289,10 @@ class HttpParserTest {
   }
 
   @Test
-  void testParsePath() {
-    String rawPath = "/kotlin?tag=awesome&tag=java&good";
-    String expectedPath = "/kotlin";
-
-    assertEquals("/kotlin", parser.parsePath(rawPath));
-    assertEquals(expectedPath, parser.parsePath(expectedPath));
-  }
-
-  @Test
   void testParseQueryParams() {
-    String rawPath = "/kotlin?tag=awesome+and+nice&tag=java%20kotlin&good";
+    String rawQuery = "tag=awesome+and+nice&tag=java%20kotlin&good";
 
-    Map<String, List<String>> parsedParams = parser.parseQueryParams(rawPath);
+    Map<String, List<String>> parsedParams = parser.parseQueryParams(rawQuery);
 
     // 1. Check total size and keys
     assertEquals(2, parsedParams.size());
@@ -328,14 +304,24 @@ class HttpParserTest {
     assertEquals(List.of(""), parsedParams.get("good"));
   }
 
-  //  @Test normalizePath currently has a bug, it can't normalize a path yet due to URI.
-  //  void testNormalizePath() {
-  //    assertEquals("/foo/bar", parser.normalizePath("/foo//bar"));
-  //    assertEquals("/foo/bar/", parser.normalizePath("/foo/bar/"));
-  //    assertEquals("/foo/bar", parser.normalizePath("/foo/./bar"));
-  //    assertEquals("/bar", parser.normalizePath("/foo/../bar"));
-  //    assertEquals("/", parser.normalizePath("//"));
-  //  }
+    @Test
+    void testNormalizePath() {
+      assertEquals("/foo/bar", parser.normalizePath("/foo//bar"));
+      assertEquals("/foo/bar/", parser.normalizePath("/foo/bar/"));
+      assertEquals("/foo/bar", parser.normalizePath("/foo/./bar"));
+      assertEquals("/bar", parser.normalizePath("/foo/../bar"));
+      assertEquals("/", parser.normalizePath("//"));
+    }
+
+  @Test
+  void testNormalizePathSecurity() {
+    // Backslash conversion
+    assertEquals("/foo/bar", parser.normalizePath("\\foo\\bar"));
+
+    // Malicious traversal attempts
+    assertThrows(BadRequestException.class, () -> parser.normalizePath("/../etc/passwd"));
+    assertThrows(BadRequestException.class, () -> parser.normalizePath("/foo/../../bar"));
+  }
 
   @Test
   void testParseHeadersWithInvalidHeader() throws IOException {
@@ -344,10 +330,8 @@ class HttpParserTest {
     InputStream mockInputStream =
         new ByteArrayInputStream(requestLine.getBytes(StandardCharsets.UTF_8));
 
-    Map<String, List<String>> parsedHeaders = parser.parseHeaders(mockInputStream, 8192, 20);
-    assertTrue(parsedHeaders.containsKey("host"));
-    assertTrue(parsedHeaders.containsKey("tag"));
-    assertFalse(parsedHeaders.containsKey("invalidheaderlinenocolon"));
+    assertThrows(BadRequestException.class, () ->
+      parser.parseHeaders(mockInputStream, 8192, 20));
   }
 
   @Test
@@ -372,7 +356,38 @@ class HttpParserTest {
     assertNotNull(request);
     assertEquals("GET", request.method());
     assertEquals("/test/path", request.path());
-    assertEquals("localhost:8080", request.headers().get("host").get(0));
-    assertEquals("val", request.queryParams().get("query").get(0));
+    assertEquals("localhost:8080", request.headers().get("host").getFirst());
+    assertEquals("val", request.queryParams().get("query").getFirst());
+  }
+
+  @Test
+  void testParseRequestSecurityVulnerabilities() throws Exception {
+    when(mockEngine.getMaxLineSize()).thenReturn(8192);
+    when(mockEngine.getMaxEmptyLines()).thenReturn(10);
+    when(mockEngine.getMaxHeaderSize()).thenReturn(8192);
+    when(mockEngine.getMaxHeaderCount()).thenReturn(100);
+    when(mockEngine.getMaxBodySize()).thenReturn(1024);
+
+    // 1. Encoded traversal: %2e%2e -> ..
+    String validEncoded = "GET /foo/%2e%2e/bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    InputStream is1 = new ByteArrayInputStream(validEncoded.getBytes(StandardCharsets.UTF_8));
+    Request req1 = parser.parseRequest(mockEngine, is1);
+    assertEquals("/bar", req1.path());
+
+    // 2. Malicious encoded traversal
+    String malEncoded = "GET /%2e%2e/etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    InputStream is2 = new ByteArrayInputStream(malEncoded.getBytes(StandardCharsets.UTF_8));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(mockEngine, is2));
+
+    // 3. Encoded slash: %2f -> /
+    String encodedSlash = "GET /foo%2fbar HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    InputStream is3 = new ByteArrayInputStream(encodedSlash.getBytes(StandardCharsets.UTF_8));
+    Request req3 = parser.parseRequest(mockEngine, is3);
+    assertEquals("/foo/bar", req3.path());
+    
+    // 4. Null byte: %00
+    String nullByteRequest = "GET /foo%00bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    InputStream is4 = new ByteArrayInputStream(nullByteRequest.getBytes(StandardCharsets.UTF_8));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(mockEngine, is4));
   }
 }

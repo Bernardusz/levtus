@@ -42,7 +42,6 @@ class HttpParser {
    * @param inputStream The stream to read the HTTP request from
    * @return {@link Request} A fully parsed Request object, or null if the stream is empty
    * @throws IOException If a network or stream error occurs
-   * @throws URISyntaxException If the request line is invalid
    * @throws BadRequestException If the request line is invalid or headers are malformed
    * @throws PayloadTooLargeException If the request's body size exceeds {@link
    *     LevtusEngine#getMaxBodySize()}, set via {@link LevtusEngine#setMaxBodySize(int)}
@@ -51,7 +50,7 @@ class HttpParser {
    * @throws LevtusNotImplementedException If the method is not implemented.
    */
   Request parseRequest(LevtusEngine engine, InputStream inputStream)
-      throws IOException, URISyntaxException, BadRequestException, PayloadTooLargeException,  HeaderTooLargeException, LevtusNotImplementedException {
+      throws IOException, BadRequestException, PayloadTooLargeException,  HeaderTooLargeException, LevtusNotImplementedException, IllegalArgumentException {
     String requestLine =
         parseRequestLine(inputStream, engine.getMaxLineSize(), engine.getMaxEmptyLines());
 
@@ -70,15 +69,23 @@ class HttpParser {
 
     // Parse the Path
     String rawPath = parseRawPath(requestLine);
-    String path = parsePath(rawPath);
-    Map<String, List<String>> queryParams = parseQueryParams(rawPath);
 
-    // Normalize the path
-    String newPath = normalizePath(path);
+    URI uri;
+    try {
+      uri = new URI(rawPath);
+    }
+    catch (URISyntaxException e) {
+      throw new BadRequestException("400 - Bad Request (Invalid URI)");
+    }
+    String path = uri.getRawPath();
+    String decodedPath = decodePath(path);
+
+    Map<String, List<String>> queryParams = parseQueryParams(uri.getRawQuery());
+    String normalizedPath = normalizePath(decodedPath);
 
     return new Request(
         method,
-        new URI(newPath).getRawPath(),
+        normalizedPath,
         headers,
         queryParams,
         inputStream,
@@ -119,8 +126,17 @@ class HttpParser {
    */
   String parseMethod(String requestLine) throws BadRequestException {
     String[] parts = requestLine.split(" ", 3);
-    if (parts.length < 2) {
+    if (parts.length != 3) {
       throw new BadRequestException("400 - Bad Request");
+    }
+
+    if (!parts[2].matches("HTTP/1\\.[01]")) {
+      if (parts[2].matches("HTTP/[0-9]+\\.[0-9]+")) {
+        throw new LevtusNotImplementedException("505 - Unsupported HTTP version");
+      }
+      else {
+        throw new BadRequestException("400 - Bad Request (Invalid HTTP version)");
+      }
     }
 
     return parts[0];
@@ -158,9 +174,15 @@ class HttpParser {
             .computeIfAbsent(headerParts[0].toLowerCase().trim(), _ -> new ArrayList<>())
             .add(headerParts[1].trim());
       }
+      else  {
+        throw new BadRequestException("400 - Bad Request (Invalid header)");
+      }
     }
     if (headers.get("host") == null) {
       throw new BadRequestException("400 - Bad Request (Missing host header)");
+    }
+    if (headers.get("host").size() > 1){
+      throw new BadRequestException("400 - Bad Request (Duplicate host header)");
     }
     if (headers.get("transfer-encoding") != null) {
       throw new LevtusNotImplementedException(headers.get("transfer-encoding").getFirst());
@@ -197,9 +219,33 @@ class HttpParser {
               "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
         }
       } catch (NumberFormatException e) {
-        // Ignore invalid content-length
+        throw new BadRequestException("400 - Bad Request (Content Length is invalid)");
       }
     }
+  }
+
+  /**
+   * Decodes the path for incoming HTTP requests.
+   *
+   * <p>Decode the path before normalization, so we can catch invalid/malicious paths early.</p>
+   *
+   * @param path the path to be checked
+   * @return the decoded path
+   * @throws BadRequestException if the path is invalid
+   */
+  String decodePath(String path) throws BadRequestException {
+    String decodedPath;
+    try {
+      decodedPath = utf8Decoder(path);
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException("400 - Bad Request (Invalid encoding)");
+    }
+
+    // Security Fix: Reject null byte injection
+    if (decodedPath.contains("\0")) {
+      throw new BadRequestException("400 - Bad Request (Null byte detected)");
+    }
+    return decodedPath;
   }
 
   /**
@@ -231,47 +277,36 @@ class HttpParser {
   }
 
   /**
-   * The helper method to parse the real path from query params.
-   *
-   * @param rawPath the parsed "valid" path of an HTTP request
-   * @return the real path of an HTTP request
-   */
-  String parsePath(String rawPath) {
-    String path;
-    if (rawPath.contains("?")) {
-      int queryStart = rawPath.indexOf("?");
-      path = rawPath.substring(0, queryStart);
-
-    } else {
-      path = rawPath;
-    }
-    return path;
-  }
-
-  /**
    * The helper method to parse query params from the "valid" path.
    *
    * <p>May also return an empty map if there are no query params.</p>
    *
-   * @param rawPath the "valid" path
+   * @param rawQuery the "valid" path
    * @return the query params
    */
-  Map<String, List<String>> parseQueryParams(String rawPath) {
+  Map<String, List<String>> parseQueryParams(String rawQuery) {
     Map<String, List<String>> queryParams = new HashMap<>();
-    int queryStart = rawPath.indexOf("?");
-    if (queryStart == -1) {
+    if (rawQuery == null || rawQuery.isEmpty()) {
       return queryParams;
     }
-    String queryString = rawPath.substring(queryStart + 1);
 
-    for (String query : queryString.split("&")) {
+    for (String query : rawQuery.split("&")) {
       String[] pair = query.split("=", 2);
       if (pair.length == 2) {
+        String key = utf8Decoder(pair[0]);
+        String value = utf8Decoder(pair[1]);
+        if (key.contains("\0") || value.contains("\0")) {
+          throw new BadRequestException("400 - Bad Request (Null byte in query)");
+        }
         queryParams
-            .computeIfAbsent(utf8Decoder(pair[0]), _ -> new ArrayList<>())
-            .add(utf8Decoder(pair[1]));
-      } else if (pair.length >= 1 && !pair[0].isEmpty()) {
-        queryParams.computeIfAbsent(utf8Decoder(pair[0]), _ -> new ArrayList<>()).add("");
+            .computeIfAbsent(key, _ -> new ArrayList<>())
+            .add(value);
+      } else if (!pair[0].isEmpty()) {
+        String key = utf8Decoder(pair[0]);
+        if (key.contains("\0")) {
+          throw new BadRequestException("400 - Bad Request (Null byte in query)");
+        }
+        queryParams.computeIfAbsent(key, _ -> new ArrayList<>()).add("");
       }
     }
     return queryParams;
@@ -285,16 +320,45 @@ class HttpParser {
    * @throws BadRequestException if the path is invalid
    */
   String normalizePath(String path) throws BadRequestException {
-    URI uri;
-    String newPath;
-    try {
-      uri = new URI(path).normalize();
-      // Now after http is gone, we need to fix every instance of double and trailing slashes
-      newPath = (uri.toString()).replaceAll("/{2,}", "/");
-    } catch (URISyntaxException e) {
-      throw new BadRequestException("400 - Bad Request");
+    if (path == null || path.isEmpty()){
+      return "/";
     }
-    return newPath;
+
+    String normalized = path.replace('\\', '/');
+    normalized = normalized.replaceAll("/{2,}", "/");
+
+    String[] segments = normalized.split("/");
+    List<String> stack = new ArrayList<>();
+
+    for (String segment : segments) {
+      if (segment.isEmpty() || segment.equals(".")) {
+        continue;
+      }
+      if (segment.equals("..")) {
+        if (stack.isEmpty()){
+          throw new BadRequestException("400 - Bad Request");
+        }
+        stack.removeLast();
+      } else {
+        stack.add(segment);
+      }
+    }
+
+    StringBuilder builder = new StringBuilder();
+    if (stack.isEmpty()){
+      builder.append("/");
+    }
+    else{
+      for (String segment : stack) {
+        builder.append("/").append(segment);
+      }
+    }
+
+    if (normalized.endsWith("/") && builder.length() > 1) {
+      builder.append("/");
+    }
+
+    return  builder.toString();
   }
 
   /**
