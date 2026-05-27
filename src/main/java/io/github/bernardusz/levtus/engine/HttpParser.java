@@ -50,10 +50,10 @@ class HttpParser {
    *     LevtusEngine#getMaxHeaderSize()}, set via {@link LevtusEngine#setMaxHeaderSize(int)}
    * @throws LevtusNotImplementedException If the method is not implemented.
    */
-  Request parseRequest(LevtusEngine engine, InputStream inputStream)
+  Request parseRequest(HttpConnectionHandler handler, InputStream inputStream)
       throws IOException, URISyntaxException, BadRequestException, PayloadTooLargeException,  HeaderTooLargeException, LevtusNotImplementedException {
     String requestLine =
-        parseRequestLine(inputStream, engine.getMaxLineSize(), engine.getMaxEmptyLines());
+        parseRequestLine(inputStream, handler.getMaxLineSize(), handler.getMaxEmptyLines());
 
     if (requestLine == null) {
       return null;
@@ -63,10 +63,10 @@ class HttpParser {
 
     // Parse the Header
     Map<String, List<String>> headers =
-        parseHeaders(inputStream, engine.getMaxHeaderSize(), engine.getMaxHeaderCount());
+        parseHeaders(inputStream, handler.getMaxHeaderSize(), handler.getMaxHeaderCount());
 
     // Parse the Body
-    validateBodySize(headers, engine.getMaxBodySize());
+    validateBodySize(headers, handler.getMaxBodySize());
 
     // Parse the Path
     String rawPath = parseRawPath(requestLine);
@@ -82,7 +82,7 @@ class HttpParser {
         headers,
         queryParams,
         inputStream,
-        engine.getMaxBodySize());
+        handler.getMaxBodySize());
   }
 
   /**
