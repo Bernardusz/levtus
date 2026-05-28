@@ -62,7 +62,7 @@ class LevtusEngineTest {
     String response = outputStream.toString(StandardCharsets.UTF_8);
     assertTrue(response.contains("503 Service Unavailable"));
     assertTrue(response.contains("Server Overloaded"));
-    
+
     verify(mockSocket).close();
   }
 }

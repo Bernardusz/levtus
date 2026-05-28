@@ -6,7 +6,6 @@ import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.spi.ConnectionHandler;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
@@ -30,8 +29,8 @@ class HttpConnectionHandler implements ConnectionHandler {
 
   public void handle(Socket client) {
     try (client;
-         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-         BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
+        BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
+        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
       client.setSoTimeout(5000);
       Response res = new Response(outputStream, staticFilesPath);
 
@@ -75,7 +74,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max empty lines in a request
    */
-  int getMaxEmptyLines(){
+  int getMaxEmptyLines() {
     return maxEmptyLines;
   }
 
@@ -93,7 +92,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max body size in a request
    */
-  int getMaxBodySize(){
+  int getMaxBodySize() {
     return maxBodySize;
   }
 
@@ -111,7 +110,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max header count in a request
    */
-  int getMaxHeaderCount(){
+  int getMaxHeaderCount() {
     return maxHeaderCount;
   }
 
@@ -129,7 +128,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max size per line of a request
    */
-  int getMaxLineSize(){
+  int getMaxLineSize() {
     return maxLineSize;
   }
 
@@ -147,7 +146,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max header size for all incoming HTTP requests
    */
-  int getMaxHeaderSize(){
+  int getMaxHeaderSize() {
     return maxHeaderSize;
   }
 
@@ -163,7 +162,7 @@ class HttpConnectionHandler implements ConnectionHandler {
   /**
    * Sets the path/directory in which all static files are set.
    *
-   * <p>Default to {@link #staticFilesPath}</p>
+   * <p>Default to {@link #staticFilesPath}
    *
    * @param staticFilesPath the static files path
    */
