@@ -169,13 +169,15 @@ class HttpParser {
           LevtusNotImplementedException {
     String header;
     int totalHeaderSize = 0;
+    int headerCount = 0;
     Map<String, List<String>> headers = new HashMap<>();
     while ((header = readLine(inputStream, maxHeaderSize)) != null && !(header.isEmpty())) {
       totalHeaderSize += header.length();
+      headerCount++;
       if (totalHeaderSize > maxHeaderSize) {
         throw new HeaderTooLargeException("Header too large");
       }
-      if (headers.size() > maxHeaderCount) {
+      if (headerCount > maxHeaderCount) {
         throw new HeaderTooLargeException("Too many headers");
       }
 

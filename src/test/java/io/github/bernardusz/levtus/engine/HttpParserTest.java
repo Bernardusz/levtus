@@ -321,6 +321,36 @@ class HttpParserTest {
   }
 
   @Test
+  void testParseHeadersTooLarge() throws IOException {
+    String headersLine =
+      "Host: localhost:8080\r\n"
+        + "User-Agent: Mozilla/5.0\r\n"
+        + "Tag: Wonderful\r\n"
+        + "Tag: Great\r\n"
+        + "Tag: JVM\r\n"
+        + "Tag: Levtus\r\n"
+        + "Tag: Engine\r\n"
+        + "Tag: Web\r\n"
+        + "Tag: Server\r\n"
+        + "Tag: Java\r\n\r\n";
+    InputStream mockInputStream =
+      new ByteArrayInputStream(headersLine.getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(HeaderTooLargeException.class ,() -> {parser.parseHeaders(mockInputStream, 8192,3);}); // This should throw HeaderTooLargeException because the TOTAL header size is too large
+
+    String secondHeaderLine =
+      "Host: localhost:8080\r\n"
+        + "User-Agent: Mozilla/5.0\r\n"
+        + "Content-Length: 123\r\n"
+        + "Tag: Java\r\n\r\n";
+
+    InputStream secondMockInputStream =
+      new ByteArrayInputStream(secondHeaderLine.getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(HeaderTooLargeException.class ,() -> {parser.parseHeaders(secondMockInputStream, 8192,3);}); // This should throw HeaderTooLargeException because the TOTAL header size is too large
+  }
+
+  @Test
   void testParseRequest() throws Exception {
     String fullRequest =
         "GET /test//path?query=val HTTP/1.1\r\n"
