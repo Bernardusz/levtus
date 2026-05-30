@@ -278,15 +278,23 @@ class HttpParser {
   String parseRawPath(String requestLine) {
     String rawPath = requestLine.split(" ", 3)[1];
 
-    if (rawPath.startsWith("http")) {
+    // Strip https:// or http://
+    if (rawPath.startsWith("http://") || rawPath.startsWith("https://")) {
       rawPath = rawPath.substring(rawPath.indexOf("//") + 2); // Strip until the https/http
-      // Strip domain name
-      rawPath = rawPath.substring(!rawPath.contains("/") ? 0 : rawPath.indexOf("/"));
-      if (rawPath.equals("/") || rawPath.isEmpty()) {
+    }
+
+    // Strip domain name
+    if (!rawPath.startsWith("/")){
+      int firstSlash = rawPath.indexOf("/");
+      if (firstSlash != -1){
+        rawPath = rawPath.substring(firstSlash);
+      }
+      else  {
         rawPath = "/";
       }
     }
-    if (!rawPath.contains("/")) {
+
+    if (rawPath.isEmpty() || !rawPath.contains("/")) {
       rawPath = "/";
     }
 
