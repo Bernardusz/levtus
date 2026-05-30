@@ -21,7 +21,7 @@ import java.util.function.Consumer;
  * </ul>
  *
  * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the
- * appropriate handlers.
+ * appropriate handlers.</p>
  */
 public class Router {
   /** The global CopyOnWriteArrayList of middleware that is executed before the route handler. */
@@ -35,6 +35,13 @@ public class Router {
    * <p>TLDR: The root node is the starting point of the Trie structure that stores the routes.
    */
   final Node root = new Node();
+
+  /**
+   * Constructs a new Router instance with an empty routing tree.
+   */
+  public Router() {
+    // Explicit default constructor to satisfy Javadoc requirements
+  }
 
   /**
    * The method that stores the route in the Trie structure.
