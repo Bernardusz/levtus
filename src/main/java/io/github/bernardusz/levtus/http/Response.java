@@ -183,8 +183,6 @@ public class Response {
   /**
    * Transmits the final HTTP status line, headers, and body bytes to the client socket.
    *
-   * <p>
-   *
    * @implNote Flushes the stream immediately after writing. Subsequent calls to any send method
    *     will be ignored.
    * @param bodyBytes the complete raw payload (must not be null)

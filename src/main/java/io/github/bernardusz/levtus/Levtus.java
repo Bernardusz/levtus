@@ -166,7 +166,7 @@ public class Levtus {
   /**
    * Designates a local directory to automatically serve static web assets (HTML, CSS, JS, Images).
    *
-   * <p>{@code app.staticFiles("public");} // Serves files from the "public" folder
+   * <p>{@code app.staticFiles("public");} Serves files from the "public" folder</p>
    *
    * @param staticFilesPath the relative or absolute path to the directory (must not be null)
    */
@@ -176,8 +176,6 @@ public class Levtus {
 
   /**
    * Binds the Levtus application to a specific TCP port and boots the server.
-   *
-   * <p>
    *
    * @implNote This is a blocking operation; the main thread will halt here while the server is
    *     active.
