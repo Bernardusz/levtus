@@ -276,6 +276,15 @@ class HttpParserTest {
   }
 
   @Test
+  void testParseRawPathBadRequest() {
+    String requestLine = "GET start.levtus.io/kotlin?tag=awesome&tag=java&good HTTP/1.1";
+    assertEquals("/kotlin?tag=awesome&tag=java&good", parser.parseRawPath(requestLine));
+
+    String secondRequestLine = "GET localhost:8080 HTTP/1.1";
+    assertEquals("/", parser.parseRawPath(secondRequestLine));
+  }
+
+  @Test
   void testParseQueryParams() {
     String rawQuery = "tag=awesome+and+nice&tag=java%20kotlin&good";
 
