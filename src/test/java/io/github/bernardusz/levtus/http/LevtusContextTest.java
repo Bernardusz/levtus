@@ -125,7 +125,7 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      mockResponse
+      realResponse
     );
 
     assertEquals("java", ctx.query("tag"));
@@ -158,7 +158,7 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      mockResponse
+      realResponse
     );
 
     assertEquals("application/json", ctx.header("Content-Type"));
@@ -178,7 +178,7 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      mockResponse
+      realResponse
     );
 
     assertEquals(List.of("application/json"), ctx.headers("Content-Type"));
