@@ -20,20 +20,52 @@ class RequestTest {
   }
 
   @Test
-  void testMultiValueQueryParams() {
-    Map<String, List<String>> queryParams =
+  void testSingleValueQueries(){
+    Map<String, List<String>> queries =
+      Map.of(
+        "tag", List.of("java", "web"),
+        "id", List.of("123"));
+
+    Request request =
+      new Request(
+        "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+
+    assertEquals("java", request.query("tag"));
+    assertEquals("123", request.query("id"));
+    assertEquals("", request.query("nonexistent"));
+  }
+
+  @Test
+  void testMultiValueQueries() {
+    Map<String, List<String>> queries =
         Map.of(
             "tag", List.of("java", "web"),
             "id", List.of("123"));
 
     Request request =
         new Request(
-            "GET", "/test", Map.of(), queryParams, new ByteArrayInputStream(new byte[0]), 1024);
+            "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
 
-    assertEquals(List.of("java", "web"), request.query("tag"));
-    assertEquals(List.of("123"), request.query("id"));
-    assertEquals(List.of(), request.query("nonexistent"));
-    assertEquals(queryParams, request.queryParams());
+    assertEquals(List.of("java", "web"), request.queries("tag"));
+    assertEquals(List.of("123"), request.queries("id"));
+    assertEquals(List.of(), request.queries("nonexistent"));
+    assertEquals(queries, request.queries());
+  }
+
+  @Test
+  void testSingleHeaderValue(){
+    Map<String, List<String>> headers =
+      Map.of(
+        "content-type", List.of("application/json"),
+        "x-custom", List.of("value1", "value2"));
+
+    Request request =
+      new Request(
+        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+
+    assertEquals("application/json", request.header("Content-Type"));
+    assertEquals("value1", request.header("X-Custom"));
+    assertEquals("", request.header("Nonexistent"));
   }
 
   @Test
@@ -46,10 +78,11 @@ class RequestTest {
     Request request =
         new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
 
-    assertEquals(List.of("application/json"), request.getHeaders("Content-Type"));
-    assertEquals(List.of("application/json"), request.getHeaders("content-type"));
-    assertEquals(List.of("value1", "value2"), request.getHeaders("X-CUSTOM"));
+    assertEquals(List.of("application/json"), request.headers("Content-Type"));
+    assertEquals(List.of("application/json"), request.headers("content-type"));
+    assertEquals(List.of("value1", "value2"), request.headers("X-CUSTOM"));
     assertEquals("application/json", request.contentType());
+    assertEquals(headers, request.headers());
   }
 
   @Test

@@ -3,6 +3,7 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,15 +49,78 @@ class LevtusContextTest {
   }
 
   @Test
-  void testQueryParamShortcut() {
-    Map<String, List<String>> queryParams = Map.of("q", List.of("search"));
-    when(mockRequest.queryParams()).thenReturn(queryParams);
-    when(mockRequest.query("q")).thenReturn(List.of("search"));
+  void testSingleValueQueriesShortcut(){
+    Map<String, List<String>> queries =
+      Map.of(
+        "tag", List.of("java", "web"),
+        "id", List.of("123"));
 
-    assertEquals(queryParams, context.queryParams());
-    assertEquals(List.of("search"), context.query("q"));
-    verify(mockRequest).queryParams();
-    verify(mockRequest).query("q");
+    Request request = new Request(
+      "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+
+    LevtusContext ctx = new LevtusContext(
+      request,
+      mockResponse
+    );
+
+    assertEquals("java", ctx.query("tag"));
+    assertEquals("123", ctx.query("id"));
+    assertEquals("", ctx.query("nonexistent"));
+  }
+
+  @Test
+  void testQueriesShortcut() {
+    Map<String, List<String>> queries = Map.of("q", List.of("search"));
+    when(mockRequest.queries()).thenReturn(queries);
+    when(mockRequest.queries("q")).thenReturn(List.of("search"));
+
+    assertEquals(queries, context.queries());
+    assertEquals(List.of("search"), context.queries("q"));
+    verify(mockRequest).queries();
+    verify(mockRequest).queries("q");
+  }
+
+  @Test
+  void testSingleHeaderValue(){
+    Map<String, List<String>> headers =
+      Map.of(
+        "content-type", List.of("application/json"),
+        "x-custom", List.of("value1", "value2"));
+
+    Request request =
+      new Request(
+        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+
+    LevtusContext ctx = new LevtusContext(
+      request,
+      mockResponse
+    );
+
+    assertEquals("application/json", ctx.header("Content-Type"));
+    assertEquals("value1", ctx.header("X-Custom"));
+    assertEquals("", ctx.header("Nonexistent"));
+  }
+
+  @Test
+  void testHeadersCaseInsensitivity() {
+    Map<String, List<String>> headers =
+      Map.of(
+        "content-type", List.of("application/json"),
+        "x-custom", List.of("value1", "value2"));
+
+    Request request =
+      new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+
+    LevtusContext ctx = new LevtusContext(
+      request,
+      mockResponse
+    );
+
+    assertEquals(List.of("application/json"), ctx.headers("Content-Type"));
+    assertEquals(List.of("application/json"), ctx.headers("content-type"));
+    assertEquals(List.of("value1", "value2"), ctx.headers("X-CUSTOM"));
+    assertEquals("application/json", request.contentType());
+    assertEquals(headers, ctx.headers());
   }
 
   @Test
