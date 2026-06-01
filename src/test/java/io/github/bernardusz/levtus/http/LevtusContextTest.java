@@ -22,7 +22,7 @@ class LevtusContextTest {
   void setUp() {
     context = new LevtusContext(mockRequest, mockResponse);
     lenient().when(mockResponse.status(anyInt())).thenReturn(mockResponse);
-    lenient().when(mockResponse.addHeader(anyString(), anyString())).thenReturn(mockResponse);
+    lenient().when(mockResponse.header(anyString(), anyString())).thenReturn(mockResponse);
   }
 
   @Test

@@ -1,5 +1,6 @@
 package io.github.bernardusz.levtus.http;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -115,6 +116,65 @@ public class LevtusContext {
    */
   public Map<String, List<String>> queryParams() {
     return req.queryParams();
+  }
+
+  /**
+   * Sets the HTTP response status code
+   *
+   * @param code the 3-digit HTTP status code
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext status(int code){
+    res.status(code);
+    return this;
+  }
+
+  /**
+   * Overrides the "Content-Type" header for the outgoing response.
+   *
+   * @param type the MIME type string (e.g., "application/json", "text/html") (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext contentType(String type) {
+    res.contentType(type);
+    return this;
+  }
+
+  /**
+   * Sets a header, replacing any existing value(s) for this header name.
+   *
+   * @param name the header name (must not be null)
+   * @param value the header value (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext header(String name, String value) {
+    res.header(name, value);
+    return this;
+  }
+
+  /**
+   * Sets a multi-value header, replacing any existing list for this header name.
+   *
+   * @param name the header name (must not be null)
+   * @param values the header values (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext headers(String name, List<String> values) {
+    res.headers(name, values);
+    return this;
+  }
+
+  /**
+   * Merges a map of headers into the existing response headers.
+   *
+   * <p>Overwrites existing keys but preserves unique existing headers.</p>
+   *
+   * @param headers the full Map of headers
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext headers(Map<String, List<String>> headers) {
+    res.headers(headers);
+    return this;
   }
 
   /**

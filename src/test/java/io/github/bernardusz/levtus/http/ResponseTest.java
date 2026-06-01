@@ -75,8 +75,8 @@ class ResponseTest {
   }
 
   @Test
-  void testAddHeader() {
-    Response returned = response.addHeader("X-Custom", "Value");
+  void testHeader() {
+    Response returned = response.header("X-Custom", "Value");
     assertEquals(response, returned);
   }
 
