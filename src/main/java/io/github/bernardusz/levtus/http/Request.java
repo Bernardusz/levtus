@@ -93,8 +93,6 @@ public class Request {
    *
    * <p>{@code ArrayList<String> tag = ctx.req().queries("tag");}</p>
    *
-   * <p>{@code String id = ctx.req().queries("id").getFirst();}</p>
-   *
    * @param key the query parameter name (must not be null)
    * @return the associated value, or an empty List if the key does not exist
    */
@@ -107,7 +105,7 @@ public class Request {
    *
    * <p>{@code HashMap<String, List<String>> id = ctx.req().queries();}</p>
    *
-   * @return a map of query parameters
+   * @return a map of query parameters, empty if no query parameters are present
    */
   public Map<String, List<String>> queries() {
     return queryParams != null ? queryParams : Map.of();
@@ -135,7 +133,7 @@ public class Request {
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = ctx.req().getHeaders("Accept");}</p>
+   * <p>{@code List<String> accepts = ctx.req().headers("Accept");}</p>
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -180,9 +178,7 @@ public class Request {
    * @return the resolved content type string
    */
   public String contentType() {
-    return headers("content-type").isEmpty()
-        ? "text/plain"
-        : headers("content-type").getFirst();
+    return header("content-type").isEmpty() ? "text/plain" : header("content-type");
   }
 
   /**
@@ -194,7 +190,7 @@ public class Request {
   public int contentLength() {
     try {
       return Integer.parseInt(
-          headers("content-length").isEmpty() ? "0" : headers("content-length").getFirst());
+          header("content-length").isEmpty() ? "0" : header("content-length"));
     } catch (NumberFormatException e) {
       return 0;
     }
