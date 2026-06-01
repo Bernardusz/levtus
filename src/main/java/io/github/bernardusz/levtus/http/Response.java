@@ -23,8 +23,8 @@ public class Response {
   /** The base directory path from which static files are served. */
   String staticFilesPath;
 
-  private int statusCode = 200;
-  private Map<String, List<String>> headers = new HashMap<>();
+  int statusCode = 200;
+  Map<String, List<String>> headers = new HashMap<>();
   private boolean isSent = false;
 
   /**

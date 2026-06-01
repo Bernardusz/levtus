@@ -1,6 +1,5 @@
 package io.github.bernardusz.levtus.http;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
