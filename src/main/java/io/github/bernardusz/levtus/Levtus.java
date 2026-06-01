@@ -7,8 +7,6 @@ import io.github.bernardusz.levtus.routing.Router;
 import java.util.function.Consumer;
 
 /**
- *
- *
  * <h2>Levtus - Levis Conatus</h2>
  *
  * The main entry point for the Levtus HTTP engine.
@@ -88,9 +86,11 @@ public class Levtus {
    * <p>{@code app.use((req, res, next) -> { System.out.println("Incoming!"); next.run(); });}
    *
    * @param middleware the interceptor logic (must not be null)
+   * @return The current Levtus instance for method chaining
    */
-  public void use(Middleware middleware) {
+  public Levtus use(Middleware middleware) {
     router.use(middleware);
+    return this;
   }
 
   /**
@@ -99,9 +99,11 @@ public class Levtus {
    *
    * @param keystorePath the file system path to the .p12 or .jks keystore file (must not be null)
    * @param keystorePass the plain-text password to unlock the keystore (must not be null)
+   * @return The current Levtus instance for method chaining
    */
-  public void ssl(String keystorePath, String keystorePass) {
+  public Levtus ssl(String keystorePath, String keystorePass) {
     engine.ssl(keystorePath, keystorePass);
+    return this;
   }
 
   /**
@@ -109,9 +111,11 @@ public class Levtus {
    * prevent thread starvation and protect system resources.
    *
    * @param maxConcurrentConnections the absolute upper limit for active connections
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxConcurrentConnections(int maxConcurrentConnections) {
+  public Levtus maxConcurrentConnections(int maxConcurrentConnections) {
     engine.setMaxConcurrentConnections(maxConcurrentConnections);
+    return this;
   }
 
   /**
@@ -119,9 +123,11 @@ public class Levtus {
    * connection. Prevents idle connection abuse.
    *
    * @param maxEmptyLines the maximum allowed consecutive empty lines
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxEmptyLines(int maxEmptyLines) {
+  public Levtus maxEmptyLines(int maxEmptyLines) {
     engine.setMaxEmptyLines(maxEmptyLines);
+    return this;
   }
 
   /**
@@ -129,9 +135,11 @@ public class Levtus {
    * If a client sends a payload exceeding this limit, the connection is rejected.
    *
    * @param maxBodySize the absolute byte limit for the payload (e.g., 1048576 for 1MB)
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxBodySize(int maxBodySize) {
+  public Levtus maxBodySize(int maxBodySize) {
     engine.setMaxBodySize(maxBodySize);
+    return this;
   }
 
   /**
@@ -139,9 +147,11 @@ public class Levtus {
    * against header-smuggling or buffer overflow attacks.
    *
    * @param maxHeaderCount the upper limit for incoming headers
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxHeaderCount(int maxHeaderCount) {
+  public Levtus maxHeaderCount(int maxHeaderCount) {
     engine.setMaxHeaderCount(maxHeaderCount);
+    return this;
   }
 
   /**
@@ -149,18 +159,22 @@ public class Levtus {
    * Useful to prevent URI Too Long attacks.
    *
    * @param maxLineSize the maximum allowed characters in the request line
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxLineSize(int maxLineSize) {
+  public Levtus maxLineSize(int maxLineSize) {
     engine.setMaxLineSize(maxLineSize);
+    return this;
   }
 
   /**
    * Defines the maximum cumulative byte size allowed for all HTTP headers combined.
    *
    * @param maxHeaderSize the maximum header block size in bytes
+   * @return The current Levtus instance for method chaining
    */
-  public void setMaxHeaderSize(int maxHeaderSize) {
+  public Levtus maxHeaderSize(int maxHeaderSize) {
     engine.setMaxHeaderSize(maxHeaderSize);
+    return this;
   }
 
   /**
@@ -169,16 +183,17 @@ public class Levtus {
    * <p>{@code app.staticFiles("public");} Serves files from the "public" folder</p>
    *
    * @param staticFilesPath the relative or absolute path to the directory (must not be null)
+   * @return The current Levtus instance for method chaining
    */
-  public void staticFiles(String staticFilesPath) {
+  public Levtus staticFiles(String staticFilesPath) {
     engine.setStaticFiles(staticFilesPath);
+    return this;
   }
 
   /**
    * Binds the Levtus application to a specific TCP port and boots the server.
    *
-   * @implNote This is a blocking operation; the main thread will halt here while the server is
-   *     active.
+   * @implNote This is a blocking operation; the main thread will halt here while the server is active.
    * @param port the valid TCP port number (1-65535) to listen on
    */
   public void listen(int port) {

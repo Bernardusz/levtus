@@ -96,12 +96,12 @@ class LevtusTest {
     void testFluentConfiguration() {
         Levtus app = Levtus.create();
         // Verify that configuration methods can be called without exceptions
-        app.setMaxConcurrentConnections(50);
-        app.setMaxBodySize(1024 * 1024);
-        app.setMaxHeaderCount(50);
-        app.setMaxHeaderSize(4096);
-        app.setMaxLineSize(4096);
-        app.setMaxEmptyLines(3);
-        app.staticFiles("public");
+        app.maxConcurrentConnections(50)
+          .maxBodySize(1024 * 1024)
+          .maxHeaderCount(50)
+          .maxHeaderSize(4096)
+          .maxLineSize(4096)
+          .maxEmptyLines(3)
+          .staticFiles("public");
     }
 }
