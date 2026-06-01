@@ -70,50 +70,89 @@ public class Request {
   }
 
   /**
-   * Retrieves the complete map of HTTP headers associated with this request.
+   * Retrieves the value - a String - of a specific query parameter by its key.
    *
-   * @return an unmodifiable map of headers
+   * <p>Return the first value inside the list of values for the query parameter.</p>
+   *
+   * <p>{@code String id = ctx.req().query("id");}</p>
+   *
+   * @param key The header key
+   * @return The first value for the header, or an empty string if the key does not exist
    */
-  public Map<String, List<String>> headers() {
-    return headers;
-  }
+  public String query(String key) {
+    List<String> resultList = queries(key);
 
-  /**
-   * Retrieves the complete map of parsed URL query parameters.
-   *
-   * <p>{@code HashMap<String, List<String>> id = ctx.req().queryParams();}
-   *
-   * @return a map of query parameters
-   */
-  public Map<String, List<String>> queryParams() {
-    return queryParams != null ? queryParams : Map.of();
+    if (resultList == null || resultList.isEmpty()) {
+      return "";
+    }
+    return resultList.getFirst();
   }
 
   /**
    * Retrieves the value - a List of String - of a specific query parameter by its key.
    *
-   * <p>{@code ArrayList<String> tag = ctx.req().query("tag");}
+   * <p>{@code ArrayList<String> tag = ctx.req().queries("tag");}</p>
    *
-   * <p>{@code String id = ctx.req().query("id").getFirst();}
+   * <p>{@code String id = ctx.req().queries("id").getFirst();}</p>
    *
    * @param key the query parameter name (must not be null)
    * @return the associated value, or an empty List if the key does not exist
    */
-  public List<String> query(String key) {
+  public List<String> queries(String key) {
     return queryParams.getOrDefault(key, List.of());
+  }
+
+  /**
+   * Retrieves the complete map of parsed URL query parameters.
+   *
+   * <p>{@code HashMap<String, List<String>> id = ctx.req().queries();}</p>
+   *
+   * @return a map of query parameters
+   */
+  public Map<String, List<String>> queries() {
+    return queryParams != null ? queryParams : Map.of();
+  }
+
+  /**
+   * Retrieves the first value associated with a specific HTTP header. Header name resolution is
+   * case-insensitive.
+   *
+   * <p>{@code String accepts = ctx.req().header("Accept");}</p>
+   *
+   * @param name the target header name (must not be null)
+   * @return a list of header values, or an empty list if the header is not present
+   */
+  public String header(String name) {
+    List<String> resultList = headers(name);
+
+    if (resultList == null || resultList.isEmpty()) {
+      return "";
+    }
+    return resultList.getFirst();
   }
 
   /**
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = ctx.req().getHeaders("Accept");}
+   * <p>{@code List<String> accepts = ctx.req().getHeaders("Accept");}</p>
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
    */
-  public List<String> getHeaders(String name) {
+  public List<String> headers(String name) {
     return headers.getOrDefault(name.toLowerCase(), List.of());
+  }
+
+  /**
+   * Retrieves the complete map of HTTP headers associated with this request.
+   *
+   * <p>{@code HashMap<String, List<String>> headers = ctx.req().headers();}</p>
+   *
+   * @return an unmodifiable map of headers
+   */
+  public Map<String, List<String>> headers() {
+    return headers;
   }
 
   /**
@@ -141,9 +180,9 @@ public class Request {
    * @return the resolved content type string
    */
   public String contentType() {
-    return getHeaders("content-type").isEmpty()
+    return headers("content-type").isEmpty()
         ? "text/plain"
-        : getHeaders("content-type").getFirst();
+        : headers("content-type").getFirst();
   }
 
   /**
@@ -155,7 +194,7 @@ public class Request {
   public int contentLength() {
     try {
       return Integer.parseInt(
-          getHeaders("content-length").isEmpty() ? "0" : getHeaders("content-length").getFirst());
+          headers("content-length").isEmpty() ? "0" : headers("content-length").getFirst());
     } catch (NumberFormatException e) {
       return 0;
     }

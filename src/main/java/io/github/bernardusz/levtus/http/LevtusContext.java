@@ -94,27 +94,77 @@ public class LevtusContext {
   }
 
   /**
+   * Retrieves the value - a String - of a specific query parameter by its key.
+   *
+   * <p>Return the first value inside the list of values for the query parameter.</p>
+   *
+   * <p>{@code String id = ctx.query("id");}</p>
+   *
+   * @param key The query key
+   * @return The first value for the header, or an empty string if the key does not exist
+   */
+  public String query(String key) {
+    return req.query(key);
+  }
+
+  /**
    * Retrieves the value - a List of String - of a specific query parameter by its key.
    *
-   * <p>{@code ArrayList<String> tag = ctx.query("tag");}</p>
-   * <p>{@code String id = ctx.query("id").getFirst();}</p>
+   * <p>{@code ArrayList<String> tag = ctx.queries("tag");}</p>
    *
    * @param name the name of the query parameter
    * @return the query parameter value, or an empty string if not found
    */
-  public List<String> query(String name) {
-    return req.query(name);
+  public List<String> queries(String name) {
+    return req.queries(name);
   }
 
   /**
    * Retrieves the complete map of parsed URL query parameters.
    *
-   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queryParams();}</p>
+   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queries();}</p>
    *
    * @return a map of query parameters
    */
-  public Map<String, List<String>> queryParams() {
-    return req.queryParams();
+  public Map<String, List<String>> queries() {
+    return req.queries();
+  }
+
+  /**
+   * Retrieves the first value associated with a specific HTTP header. Header name resolution is
+   * case-insensitive.
+   *
+   * <p>{@code String accepts = ctx.header("Accept");}</p>
+   *
+   * @param name the target header name (must not be null)
+   * @return a list of header values, or an empty list if the header is not present
+   */
+  public String header(String name) {
+    return req.header(name);
+  }
+
+  /**
+   * Retrieves all values associated with a specific HTTP header. Header name resolution is
+   * case-insensitive.
+   *
+   * <p>{@code List<String> accepts = ctx.getHeaders("Accept");}</p>
+   *
+   * @param name the target header name (must not be null)
+   * @return a list of header values, or an empty list if the header is not present
+   */
+  public List<String> headers(String name) {
+    return req.headers(name);
+  }
+
+  /**
+   * Retrieves the complete map of HTTP headers associated with this request.
+   *
+   * <p>{@code HashMap<String, List<String>> headers = ctx.headers();}</p>
+   *
+   * @return an unmodifiable map of headers
+   */
+  public Map<String, List<String>> headers() {
+    return req.headers();
   }
 
   /**

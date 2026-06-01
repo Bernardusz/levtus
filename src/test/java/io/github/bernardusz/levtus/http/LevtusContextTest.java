@@ -50,13 +50,13 @@ class LevtusContextTest {
   @Test
   void testQueryParamShortcut() {
     Map<String, List<String>> queryParams = Map.of("q", List.of("search"));
-    when(mockRequest.queryParams()).thenReturn(queryParams);
-    when(mockRequest.query("q")).thenReturn(List.of("search"));
+    when(mockRequest.queries()).thenReturn(queryParams);
+    when(mockRequest.queries("q")).thenReturn(List.of("search"));
 
-    assertEquals(queryParams, context.queryParams());
-    assertEquals(List.of("search"), context.query("q"));
-    verify(mockRequest).queryParams();
-    verify(mockRequest).query("q");
+    assertEquals(queryParams, context.queries());
+    assertEquals(List.of("search"), context.queries("q"));
+    verify(mockRequest).queries();
+    verify(mockRequest).queries("q");
   }
 
   @Test

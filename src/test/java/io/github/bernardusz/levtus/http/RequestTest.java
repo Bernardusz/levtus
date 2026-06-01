@@ -30,10 +30,10 @@ class RequestTest {
         new Request(
             "GET", "/test", Map.of(), queryParams, new ByteArrayInputStream(new byte[0]), 1024);
 
-    assertEquals(List.of("java", "web"), request.query("tag"));
-    assertEquals(List.of("123"), request.query("id"));
-    assertEquals(List.of(), request.query("nonexistent"));
-    assertEquals(queryParams, request.queryParams());
+    assertEquals(List.of("java", "web"), request.queries("tag"));
+    assertEquals(List.of("123"), request.queries("id"));
+    assertEquals(List.of(), request.queries("nonexistent"));
+    assertEquals(queryParams, request.queries());
   }
 
   @Test
@@ -46,9 +46,9 @@ class RequestTest {
     Request request =
         new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
 
-    assertEquals(List.of("application/json"), request.getHeaders("Content-Type"));
-    assertEquals(List.of("application/json"), request.getHeaders("content-type"));
-    assertEquals(List.of("value1", "value2"), request.getHeaders("X-CUSTOM"));
+    assertEquals(List.of("application/json"), request.headers("Content-Type"));
+    assertEquals(List.of("application/json"), request.headers("content-type"));
+    assertEquals(List.of("value1", "value2"), request.headers("X-CUSTOM"));
     assertEquals("application/json", request.contentType());
   }
 
