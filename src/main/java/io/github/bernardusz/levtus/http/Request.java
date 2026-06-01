@@ -18,7 +18,7 @@ public class Request {
   private final String method;
   private final String path;
   private final Map<String, List<String>> headers;
-  private final Map<String, List<String>> queryParams;
+  private final Map<String, List<String>> queries;
   private final InputStream bodyStream;
   private final int maxBodySize;
   private byte[] cachedBody;
@@ -32,7 +32,7 @@ public class Request {
    * @param method the HTTP method (e.g., "GET", "POST") (must not be null)
    * @param path the requested URI path (must not be null)
    * @param headers a map of HTTP headers, where keys are strictly lowercase (must not be null)
-   * @param queryParams a map of parsed query List of String parameters (must not be null)
+   * @param queries a map of parsed query List of String parameters (must not be null)
    * @param bodyStream the raw input stream from the client socket (must not be null)
    * @param maxBodySize the configured absolute byte limit for the payload
    */
@@ -40,13 +40,13 @@ public class Request {
       String method,
       String path,
       Map<String, List<String>> headers,
-      Map<String, List<String>> queryParams,
+      Map<String, List<String>> queries,
       InputStream bodyStream,
       int maxBodySize) {
     this.method = method;
     this.path = path;
     this.headers = headers;
-    this.queryParams = queryParams;
+    this.queries = queries;
     this.bodyStream = bodyStream;
     this.maxBodySize = maxBodySize;
   }
@@ -97,7 +97,7 @@ public class Request {
    * @return the associated value, or an empty List if the key does not exist
    */
   public List<String> queries(String key) {
-    return queryParams.getOrDefault(key, List.of());
+    return queries.getOrDefault(key, List.of());
   }
 
   /**
@@ -108,7 +108,7 @@ public class Request {
    * @return a map of query parameters, empty if no query parameters are present
    */
   public Map<String, List<String>> queries() {
-    return queryParams != null ? queryParams : Map.of();
+    return queries != null ? queries : Map.of();
   }
 
   /**

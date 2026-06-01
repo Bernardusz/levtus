@@ -147,7 +147,7 @@ public class LevtusContext {
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = ctx.getHeaders("Accept");}</p>
+   * <p>{@code List<String> accepts = ctx.headers("Accept");}</p>
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
