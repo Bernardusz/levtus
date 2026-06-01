@@ -382,7 +382,7 @@ class HttpParserTest {
     assertEquals("GET", request.method());
     assertEquals("/test/path", request.path());
     assertEquals("localhost:8080", request.headers().get("host").getFirst());
-    assertEquals("val", request.queryParams().get("query").getFirst());
+    assertEquals("val", request.queries().get("query").getFirst());
   }
 
   @Test
