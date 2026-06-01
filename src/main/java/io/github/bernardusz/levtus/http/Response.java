@@ -23,8 +23,8 @@ public class Response {
   /** The base directory path from which static files are served. */
   String staticFilesPath;
 
-  private int statusCode = 200;
-  private Map<String, List<String>> headers = new HashMap<>();
+  int statusCode = 200;
+  Map<String, List<String>> headers = new HashMap<>();
   private boolean isSent = false;
 
   /**
@@ -58,21 +58,47 @@ public class Response {
    * Overrides the "Content-Type" header for the outgoing response.
    *
    * @param type the MIME type string (e.g., "application/json", "text/html") (must not be null)
+   * @return The current Response instance for method chaining
    */
-  public void contentType(String type) {
+  public Response contentType(String type) {
     headers.put("Content-Type", new ArrayList<>(List.of(type)));
+    return this;
   }
 
   /**
-   * Appends a new header or adds a value to an existing header.
+   * Sets a header, replacing any existing value(s) for this header name.
    *
    * @param name the header name (must not be null)
    * @param value the header value (must not be null)
    * @return the current Response instance for method chaining
    */
-  public Response addHeader(String name, String value) {
-    headers.computeIfAbsent(name, _ -> new ArrayList<>());
-    headers.get(name).add(value);
+  public Response header(String name, String value) {
+    headers.put(name, new ArrayList<>(List.of(value)));
+    return this;
+  }
+
+  /**
+   * Sets a multi-value header, replacing any existing list for this header name.
+   *
+   * @param name the header name (must not be null)
+   * @param values the header values (must not be null)
+   * @return the current Response instance for method chaining
+   */
+  public Response headers(String name, List<String> values) {
+    headers.put(name, values);
+    return this;
+  }
+
+  /**
+   * Merges a map of headers into the existing response headers.
+   *
+   * <p>Overwrites existing keys but preserves unique existing headers.</p>
+   *
+   * @param headers the full Map of headers
+   * @return the current Response instance for method chaining
+   */
+  public Response headers(Map<String, List<String>> headers) {
+    this.headers.putAll(headers); // We do this because we want batch-config by user to be authoritative
     return this;
   }
 

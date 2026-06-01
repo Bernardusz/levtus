@@ -7,6 +7,10 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,15 +73,61 @@ class ResponseTest {
   }
 
   @Test
+  void testStatusChange(){
+    response.status(404);
+    assertEquals(404, response.statusCode);
+  }
+
+  @Test
   void testStatusChaining() {
     Response returned = response.status(404);
     assertEquals(response, returned);
   }
 
   @Test
-  void testAddHeader() {
-    Response returned = response.addHeader("X-Custom", "Value");
+  void testHeader() {
+    Response returned = response.header("X-Custom", "Value");
     assertEquals(response, returned);
+  }
+
+  @Test
+  void testSingularHeader(){
+    response.header("X-Custom", "Value");
+    response.header("Server", "Levtus-0.1.0");
+    response.header("Server", "Levtus-0.1.1");
+
+    assertEquals("Levtus-0.1.1", response.headers.get("Server").getFirst());
+    assertEquals("Value", response.headers.get("X-Custom").getFirst());
+  }
+
+  @Test
+  void testHeaderWithArray() {
+    List<String> firstHeaders = List.of("Value1", "Value2");
+    response.headers("X-Custom", List.of("Bruh"));
+    response.headers("X-Custom", firstHeaders);
+
+    List<String> secondHeaders = List.of("Value1", "Value2");
+    response.headers("Y-Custom", List.of("Bruh"));
+    response.headers("Y-Custom", secondHeaders);
+
+    assertEquals(firstHeaders, response.headers.get("X-Custom"));
+    assertEquals(firstHeaders, response.headers.get("X-Custom"));
+  }
+
+  @Test
+  void testFullHeaders(){
+    Map<String, List<String>> headers = new HashMap<>();
+    List<String> firstHeaders = List.of("Value1", "Value2");
+    List<String> secondHeaders = List.of("Value1", "Value2");
+    headers.put("X-Custom", firstHeaders);
+    headers.put("Y-Custom", secondHeaders);
+
+    headers.put("Server", List.of("Levtus-0.1")); // Default headers response
+    headers.put("Content-Type", response.contentType("text/html").headers.get("Content-Type"));
+
+    response.headers(headers);
+
+    assertEquals(headers, response.headers);
   }
 
   @Test
