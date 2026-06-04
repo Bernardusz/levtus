@@ -22,6 +22,7 @@ class LevtusContextTest {
   @Mock private Request mockRequest;
   private Response realResponse;
   private LevtusContext context;
+  Map<String, String> pathParams;
 
   private ByteArrayOutputStream responseBuffer; // Captures the written data
 
@@ -31,8 +32,9 @@ class LevtusContextTest {
 
     responseBuffer = new ByteArrayOutputStream();
     realResponse = new Response(new BufferedOutputStream(responseBuffer), "./public");
+    pathParams = new HashMap<>();
 
-    context = new LevtusContext(mockRequest, realResponse);
+    context = new LevtusContext(mockRequest, realResponse, new HashMap<>());
   }
 
   @Test
@@ -44,11 +46,29 @@ class LevtusContextTest {
   @Test
   void testPathParamShortcut() {
     Map<String, String> pathParams = Map.of("userId", "42");
-    context.setPathParams(pathParams);
+    LevtusContext levtusContext = new LevtusContext(mockRequest, realResponse, pathParams);
 
-    assertEquals("42", context.param("userId"));
-    assertEquals("", context.param("missing"));
-    assertEquals(pathParams, context.params());
+    assertEquals("42", levtusContext.param("userId"));
+    assertEquals("", levtusContext.param("missing"));
+    assertEquals(pathParams, levtusContext.params());
+  }
+
+  @Test
+  void testPathParamsImmutability() {
+    Map<String, String> params = new HashMap<>();
+    params.put("id", "1");
+    LevtusContext ctx = new LevtusContext(mockRequest, realResponse, params);
+
+    // Attempt to modify the original map
+    params.put("id", "2");
+
+    // Context should still have the original value
+    assertEquals("1", ctx.param("id"));
+
+    // Attempt to modify the map returned by params()
+    assertThrows(UnsupportedOperationException.class, () -> {
+      ctx.params().put("id", "3");
+    });
   }
 
   @Test
@@ -125,7 +145,8 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      realResponse
+      realResponse,
+      pathParams
     );
 
     assertEquals("java", ctx.query("tag"));
@@ -158,7 +179,8 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      realResponse
+      realResponse,
+      pathParams
     );
 
     assertEquals("application/json", ctx.header("Content-Type"));
@@ -178,7 +200,8 @@ class LevtusContextTest {
 
     LevtusContext ctx = new LevtusContext(
       request,
-      realResponse
+      realResponse,
+      pathParams
     );
 
     assertEquals(List.of("application/json"), ctx.headers("Content-Type"));

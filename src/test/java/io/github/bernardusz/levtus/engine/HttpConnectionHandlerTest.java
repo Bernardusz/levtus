@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import io.github.bernardusz.levtus.exception.BadRequestException;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -50,7 +51,7 @@ class HttpConnectionHandlerTest {
 
     handler.handle(mockSocket);
 
-    verify(mockRouter).handle(any(LevtusContext.class));
+    verify(mockRouter).handle(any(Request.class), any(Response.class));
     verify(mockSocket).close();
   }
 

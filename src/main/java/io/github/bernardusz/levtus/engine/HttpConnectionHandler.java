@@ -1,7 +1,6 @@
 package io.github.bernardusz.levtus.engine;
 
 import io.github.bernardusz.levtus.exception.LevtusHttpException;
-import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
@@ -38,9 +37,8 @@ class HttpConnectionHandler implements ConnectionHandler {
         Request req;
         while ((req = parser.parseRequest(this, inputStream)) != null) {
           res = new Response(outputStream, staticFilesPath);
-          LevtusContext ctx = new LevtusContext(req, res);
           client.setSoTimeout(20000);
-          router.handle(ctx);
+          router.handle(req, res);
           if (!res.isSent()) {
             res.status(404).send("404 - Not Found");
           }

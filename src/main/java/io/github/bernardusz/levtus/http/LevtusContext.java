@@ -9,7 +9,7 @@ import java.util.Map;
  * <p>Responsible for:</p>
  * <ul>
  *   <li>Wrapping HTTP Requests and Output Stream</li>
- *   <li>Handling, Setting, and Saving Path Parameters</li>
+ *   <li>Handling and providing access to Path Parameters</li>
  *   <li>Handling Query Parameters</li>
  *   <li>Handling Request Body</li>
  *   <li>Handling Response transmission</li>
@@ -19,26 +19,28 @@ import java.util.Map;
  */
 public class LevtusContext {
   /** The Request object that represents an incoming HTTP/1.1 request. */
-  Request req;
+  final Request req;
 
   /** The fully instantiated Response object that represents an outgoing HTTP/1.1 response. */
-  Response res;
+  final Response res;
 
   /**
    * The path parameters extracted from the URI based on the route pattern (wildcards).
    * For example, in a route "/users/{id}", the value of "{id}" is stored here.
    */
-  Map<String, String> pathParams;
+  final Map<String, String> pathParams;
 
   /**
-   * Instantiates a new LevtusContext, setting the Request and Response objects.
+   * Instantiates a new LevtusContext, setting the Request, Response, and Path Parameters.
    *
    * @param req the incoming request
    * @param res the outgoing response
+   * @param pathParams the extracted path parameters
    */
-  public LevtusContext(Request req, Response res) {
+  public LevtusContext(Request req, Response res, Map<String, String> pathParams) {
     this.req = req;
     this.res = res;
+    this.pathParams = pathParams != null ? Map.copyOf(pathParams) : Map.of();
   }
 
   /**
@@ -57,17 +59,6 @@ public class LevtusContext {
    */
   public Response res() {
     return res;
-  }
-
-  /**
-   * Sets the path parameters (wildcards) extracted from the URI based on the route pattern.
-   *
-   * @implNote This replaces the entire path parameters map, it does not append to it.
-   *
-   * @param pathParams the map of extracted path parameters
-   */
-  public void setPathParams(Map<String, String> pathParams) {
-    this.pathParams = pathParams;
   }
 
   /**

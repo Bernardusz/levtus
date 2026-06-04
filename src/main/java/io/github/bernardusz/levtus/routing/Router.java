@@ -1,6 +1,9 @@
 package io.github.bernardusz.levtus.routing;
 
 import io.github.bernardusz.levtus.http.LevtusContext;
+import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
+
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -17,7 +20,7 @@ import java.util.function.Consumer;
  * <ul>
  *   <li>Storing routes (and their handler) as Nodes in a Prefix Tree (Trie) {@link Router#root}
  *   <li>Executing the middleware chain {@link Router#executeChain(LevtusContext, Consumer)}
- *   <li>Executing the route handler {@link Router#handle(LevtusContext)}
+ *   <li>Executing the route handler {@link Router#handle(Request, Response)}
  * </ul>
  *
  * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the
@@ -77,15 +80,16 @@ public class Router {
    * The method that handles the request by matching the route and executing the middleware chain
    * first before the route handler.
    *
-   * @param ctx the {@link LevtusContext} containing the request and response objects
+   * @param req the {@link Request} object containing the request data
+   * @param res the {@link Response} object containing the response data
    */
-  public void handle(LevtusContext ctx) {
-    String method = ctx.req().method().toUpperCase();
-    String path = ctx.req().path();
+  public void handle(Request req, Response res) {
+    String method = req.method().toUpperCase();
+    String path = req.path();
 
     Node current = root.children.get(method);
     if (current == null) {
-      ctx.res().status(404).send("404 - Not Found");
+      res.status(404).send("404 - Not Found");
       return;
     }
 
@@ -102,15 +106,15 @@ public class Router {
         current = current.wildcardChild;
         params.put(current.wildcardName, segment);
       } else {
-        ctx.send(404, "404 - Not Found");
+        res.status(404).send("404 - Not Found");
         return;
       }
     }
     if (current.handler != null) {
-      ctx.setPathParams(params);
+      LevtusContext ctx = new LevtusContext(req, res, params);
       executeChain(ctx, current.handler);
     } else {
-      ctx.send(404, "404 - Not Found");
+      res.status(404).send("404 - Not Found");
     }
   }
 
