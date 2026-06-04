@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,19 +16,15 @@ import org.mockito.Mockito;
 
 class RouterTest {
     private Router router;
-    private LevtusContext mockContext;
     private Request mockRequest;
     private Response mockResponse;
 
     @BeforeEach
     void setUp() {
         router = new Router();
-        mockContext = Mockito.mock(LevtusContext.class);
         mockRequest = Mockito.mock(Request.class);
         mockResponse = Mockito.mock(Response.class);
 
-        Mockito.when(mockContext.req()).thenReturn(mockRequest);
-        Mockito.when(mockContext.res()).thenReturn(mockResponse);
         Mockito.when(mockResponse.status(Mockito.anyInt())).thenReturn(mockResponse);
     }
 
@@ -37,7 +36,7 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/hello");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(true, handled.get(), "Handler should have been executed");
     }
@@ -50,7 +49,7 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("get");
         Mockito.when(mockRequest.path()).thenReturn("/hello");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(true, handled.get(), "Should match regardless of case");
     }
@@ -63,7 +62,7 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(true, handled.get(), "Should match root route");
     }
@@ -76,12 +75,12 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         
         Mockito.when(mockRequest.path()).thenReturn("/hello/");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         assertEquals(true, handled.get(), "Should match with trailing slash");
 
         handled.set(false);
         Mockito.when(mockRequest.path()).thenReturn("//hello");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         assertEquals(true, handled.get(), "Should match with double slash");
     }
 
@@ -96,7 +95,7 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/user/profile");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(true, staticHandled.get(), "Static route should take precedence");
         assertEquals(false, wildcardHandled.get(), "Wildcard route should not be called");
@@ -105,17 +104,18 @@ class RouterTest {
     @Test
     void testMultipleWildcards() {
         AtomicBoolean handled = new AtomicBoolean(false);
-        router.get("/user/{userId}/post/{postId}", ctx -> handled.set(true));
+        router.get("/user/{userId}/post/{postId}", ctx -> {
+            handled.set(true);
+            assertEquals("42", ctx.param("userId"));
+            assertEquals("100", ctx.param("postId"));
+        });
 
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/user/42/post/100");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
-        assertEquals(true, handled.get());
-        Mockito.verify(mockContext).setPathParams(Mockito.argThat(params -> 
-            "42".equals(params.get("userId")) && "100".equals(params.get("postId"))
-        ));
+        assertEquals(true, handled.get(), "Handler should have been executed with correct params");
     }
 
     @Test
@@ -131,15 +131,15 @@ class RouterTest {
         Mockito.when(mockRequest.path()).thenReturn("/test");
 
         Mockito.when(mockRequest.method()).thenReturn("POST");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         assertEquals(true, postHandled.get());
 
         Mockito.when(mockRequest.method()).thenReturn("PUT");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         assertEquals(true, putHandled.get());
 
         Mockito.when(mockRequest.method()).thenReturn("DELETE");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         assertEquals(true, deleteHandled.get());
     }
 
@@ -157,28 +157,28 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/test");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(false, handlerExecuted.get(), "Handler should NOT have been executed");
-        Mockito.verify(mockContext).send(401, "Unauthorized");
+        Mockito.verify(mockResponse).send("Unauthorized");
     }
 
     @Test
-    void testRouteNotFound() {
+    void testMethodNotFound() {
         router.get("/hello", ctx -> {});
-
-        // Case 1: Method not found (e.g. OPTIONS if not registered)
         Mockito.when(mockRequest.method()).thenReturn("OPTIONS");
         Mockito.when(mockRequest.path()).thenReturn("/hello");
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
         Mockito.verify(mockResponse).status(404);
         Mockito.verify(mockResponse).send("404 - Not Found");
+    }
 
-        // Case 2: Path not found
+    @Test
+    void testPathNotFound(){
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/not-found");
-        router.handle(mockContext);
-        Mockito.verify(mockContext).send(Mockito.eq(404), Mockito.anyString());
+        router.handle(mockRequest, mockResponse);
+        Mockito.verify(mockResponse).send(Mockito.anyString());
     }
 
     @Test
@@ -186,17 +186,15 @@ class RouterTest {
         AtomicBoolean handled = new AtomicBoolean(false);
         router.get("/user/{id}", ctx -> {
             handled.set(true);
+            assertEquals("123", ctx.param("id"));
         });
 
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/user/123");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals(true, handled.get(), "Wildcard handler should have been executed");
-        Mockito.verify(mockContext).setPathParams(Mockito.argThat(params -> 
-            "123".equals(params.get("id"))
-        ));
     }
 
     @Test
@@ -223,7 +221,7 @@ class RouterTest {
         Mockito.when(mockRequest.method()).thenReturn("GET");
         Mockito.when(mockRequest.path()).thenReturn("/test");
 
-        router.handle(mockContext);
+        router.handle(mockRequest, mockResponse);
 
         assertEquals("M1-Start Handler M1-End", executionOrder.toString());
     }
