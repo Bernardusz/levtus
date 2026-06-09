@@ -9,28 +9,38 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 
 /**
- * Configuration for server security.
+ * Configuration for the server's security layer, specifically SSL/TLS settings.
  *
- * @param keystorePath The path to the .p12 file.
- * @param keystorePass The password for the keystore.
+ * <p>This record manages the loading of cryptographic keys and the instantiation of the {@link
+ * ServerSocket}. It supports both standard HTTP and secure HTTPS connections depending on whether
+ * keystore information is provided.
+ *
+ * @param keystorePath the file system path to the .p12 (PKCS12) keystore file; if null, SSL is
+ *     disabled
+ * @param keystorePass the password required to unlock and read the keystore file
  */
 public record SecurityConfig(String keystorePath, String keystorePass) {
   /**
-   * Is enabled boolean.
+   * Determines if secure connections (HTTPS) are enabled based on the current configuration.
    *
-   * @return the boolean
+   * @return {@code true} if both keystore path and password are provided, {@code false} otherwise
    */
   public boolean isEnabled() {
     return keystorePath != null && keystorePass != null;
   }
 
   /**
-   * Gets server socket factory.
+   * Instantiates and returns a {@link ServerSocket} bound to the specified port.
    *
-   * @param port the port
-   * @return the server socket factory
+   * <p>If security is enabled via a valid keystore, this method initializes an {@link SSLContext}
+   * with TLSv1.3 and returns a secure socket. Otherwise, it returns a standard plain-text socket.
+   *
+   * @param port the TCP port to bind the server socket to
+   * @return a configured ServerSocket (secure or non-secure)
+   * @throws RuntimeException if the keystore cannot be loaded or the SSL context fails to
+   *     initialize
    */
-  public ServerSocket getServerSocketFactory(int port) {
+  public ServerSocket getServerSocket(int port) {
     try {
       ServerSocketFactory serverSocketFactory = null;
       if (keystorePath != null && keystorePass != null) {
@@ -52,10 +62,9 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
       } else if (keystorePath == null && keystorePass == null) {
         serverSocketFactory = ServerSocketFactory.getDefault();
 
-      } else if (keystorePass == null) {
-        throw new java.security.NoSuchAlgorithmException("keystorePass is null");
-      } else if (keystorePath == null) {
-        throw new java.security.NoSuchAlgorithmException("keystorePath is null");
+      } else {
+        throw new IllegalArgumentException(
+            "Both keystorePath and keystorePass must be provided for SSL, or both must be null for plain HTTP");
       }
 
       return serverSocketFactory.createServerSocket(port);

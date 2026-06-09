@@ -10,11 +10,16 @@
 
 ---
 
-## 🏗 Why Levtus?
+## 🚧 **IMPORTANT - Construction Zone: Pre-v1.0.0** 
+> Levtus is currently in rapid iteration mode. We prioritize **Developer Experience (DX)** and **Performance** above all else, which means the API will evolve quickly and **breaking changes** are common. Stable Long-Term Support (LTS) will only be provided starting from version **1.0.0**.
 
-Most modern Java frameworks are built on top of complex abstractions like Netty or Jetty. **Levtus** was born from a desire to strip away the "magic" and build a protocol-compliant engine from raw sockets. 
+---
 
-It is designed for developers who need a minimalist, ultra-fast web core for microservices, embedded systems, or high-performance APIs without the overhead of a massive framework.
+## ✨ Why Levtus?
+- 📦 Zero External Dependencies: No runtime overhead, no third-party version conflicts, and tiny deployment binaries.
+- 🌳 Trie-Based Router: Route matching speed is proportional only to the depth of your URL segments (O(L)), making it consistently fast even as you add hundreds of endpoints.
+- 🔒 Built-In Security Guards: Configurable hardware safeguards prevent denial-of-service (DoS) attempts by enforcing strict size boundaries on headers during stream consumption.
+- 🎯 Native Java Performance: Optimized for Java 25+, taking full advantage of modern platform innovations.
 
 ---
 
