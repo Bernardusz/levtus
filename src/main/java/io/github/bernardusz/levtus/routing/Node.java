@@ -9,7 +9,7 @@ import java.util.function.Consumer;
  * Represents a single node within the internal Prefix Tree (Trie) used for request routing.
  *
  * <p>Each node corresponds to a specific segment of a URI path or an HTTP method. Nodes can have
- * static children (exact matches) or a single wildcard child (parameterized matches).</p>
+ * static children (exact matches) or a single wildcard child (parameterized matches).
  */
 public class Node {
   /**
@@ -39,9 +39,7 @@ public class Node {
    */
   Consumer<LevtusContext> handler;
 
-  /**
-   * Constructs a new, empty routing Node.
-   */
+  /** Constructs a new, empty routing Node. */
   public Node() {
     // Explicit default constructor to satisfy Javadoc requirements
   }

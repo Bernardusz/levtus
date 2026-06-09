@@ -3,7 +3,6 @@ package io.github.bernardusz.levtus.routing;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
-
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -24,7 +23,7 @@ import java.util.function.Consumer;
  * </ul>
  *
  * <p>TLDR: The router is the main entry point for handling HTTP requests and routing them to the
- * appropriate handlers.</p>
+ * appropriate handlers.
  */
 public class Router {
   /** The global CopyOnWriteArrayList of middleware that is executed before the route handler. */
@@ -39,9 +38,7 @@ public class Router {
    */
   final Node root = new Node();
 
-  /**
-   * Constructs a new Router instance with an empty routing tree.
-   */
+  /** Constructs a new Router instance with an empty routing tree. */
   public Router() {
     // Explicit default constructor to satisfy Javadoc requirements
   }

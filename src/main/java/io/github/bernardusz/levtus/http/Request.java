@@ -72,9 +72,9 @@ public class Request {
   /**
    * Retrieves the value - a String - of a specific query parameter by its key.
    *
-   * <p>Return the first value inside the list of values for the query parameter.</p>
+   * <p>Return the first value inside the list of values for the query parameter.
    *
-   * <p>{@code String id = ctx.req().query("id");}</p>
+   * <p>{@code String id = ctx.req().query("id");}
    *
    * @param key The header key
    * @return The first value for the header, or an empty string if the key does not exist
@@ -91,7 +91,7 @@ public class Request {
   /**
    * Retrieves the value - a List of String - of a specific query parameter by its key.
    *
-   * <p>{@code ArrayList<String> tag = ctx.req().queries("tag");}</p>
+   * <p>{@code ArrayList<String> tag = ctx.req().queries("tag");}
    *
    * @param key the query parameter name (must not be null)
    * @return the associated value, or an empty List if the key does not exist
@@ -103,7 +103,7 @@ public class Request {
   /**
    * Retrieves the complete map of parsed URL query parameters.
    *
-   * <p>{@code HashMap<String, List<String>> id = ctx.req().queries();}</p>
+   * <p>{@code HashMap<String, List<String>> id = ctx.req().queries();}
    *
    * @return a map of query parameters, empty if no query parameters are present
    */
@@ -115,7 +115,7 @@ public class Request {
    * Retrieves the first value associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code String accepts = ctx.req().header("Accept");}</p>
+   * <p>{@code String accepts = ctx.req().header("Accept");}
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -133,7 +133,7 @@ public class Request {
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = ctx.req().headers("Accept");}</p>
+   * <p>{@code List<String> accepts = ctx.req().headers("Accept");}
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -145,7 +145,7 @@ public class Request {
   /**
    * Retrieves the complete map of HTTP headers associated with this request.
    *
-   * <p>{@code HashMap<String, List<String>> headers = ctx.req().headers();}</p>
+   * <p>{@code HashMap<String, List<String>> headers = ctx.req().headers();}
    *
    * @return an unmodifiable map of headers
    */
@@ -189,8 +189,7 @@ public class Request {
    */
   public int contentLength() {
     try {
-      return Integer.parseInt(
-          header("content-length").isEmpty() ? "0" : header("content-length"));
+      return Integer.parseInt(header("content-length").isEmpty() ? "0" : header("content-length"));
     } catch (NumberFormatException e) {
       return 0;
     }

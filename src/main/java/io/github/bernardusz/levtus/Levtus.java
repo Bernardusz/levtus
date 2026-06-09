@@ -7,6 +7,8 @@ import io.github.bernardusz.levtus.routing.Router;
 import java.util.function.Consumer;
 
 /**
+ *
+ *
  * <h2>Levtus - Levis Conatus</h2>
  *
  * The main entry point for the Levtus HTTP engine.
@@ -180,7 +182,7 @@ public class Levtus {
   /**
    * Designates a local directory to automatically serve static web assets (HTML, CSS, JS, Images).
    *
-   * <p>{@code app.staticFiles("public");} Serves files from the "public" folder</p>
+   * <p>{@code app.staticFiles("public");} Serves files from the "public" folder
    *
    * @param staticFilesPath the relative or absolute path to the directory (must not be null)
    * @return The current Levtus instance for method chaining
@@ -193,7 +195,8 @@ public class Levtus {
   /**
    * Binds the Levtus application to a specific TCP port and boots the server.
    *
-   * @implNote This is a blocking operation; the main thread will halt here while the server is active.
+   * @implNote This is a blocking operation; the main thread will halt here while the server is
+   *     active.
    * @param port the valid TCP port number (1-65535) to listen on
    */
   public void listen(int port) {

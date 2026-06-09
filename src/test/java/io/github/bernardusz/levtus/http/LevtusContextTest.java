@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +19,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class LevtusContextTest {
 
+  Map<String, String> pathParams;
   @Mock private Request mockRequest;
   private Response realResponse;
   private LevtusContext context;
-  Map<String, String> pathParams;
-
   private ByteArrayOutputStream responseBuffer; // Captures the written data
 
   @BeforeEach

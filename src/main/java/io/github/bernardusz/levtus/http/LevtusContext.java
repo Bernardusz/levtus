@@ -4,16 +4,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The LevtusContext that wraps HTTP Requests and Output Stream as {@link Request} and {@link Response}.
+ * The LevtusContext that wraps HTTP Requests and Output Stream as {@link Request} and {@link
+ * Response}.
  *
- * <p>Responsible for:</p>
+ * <p>Responsible for:
+ *
  * <ul>
- *   <li>Wrapping HTTP Requests and Output Stream</li>
- *   <li>Handling and providing access to Path Parameters</li>
- *   <li>Handling Query Parameters</li>
- *   <li>Handling Request Body</li>
- *   <li>Handling Response transmission</li>
+ *   <li>Wrapping HTTP Requests and Output Stream
+ *   <li>Handling and providing access to Path Parameters
+ *   <li>Handling Query Parameters
+ *   <li>Handling Request Body
+ *   <li>Handling Response transmission
  * </ul>
+ *
  * @author Bernardusz
  * @version 0.1.1
  */
@@ -25,8 +28,8 @@ public class LevtusContext {
   final Response res;
 
   /**
-   * The path parameters extracted from the URI based on the route pattern (wildcards).
-   * For example, in a route "/users/{id}", the value of "{id}" is stored here.
+   * The path parameters extracted from the URI based on the route pattern (wildcards). For example,
+   * in a route "/users/{id}", the value of "{id}" is stored here.
    */
   final Map<String, String> pathParams;
 
@@ -87,9 +90,9 @@ public class LevtusContext {
   /**
    * Retrieves the value - a String - of a specific query parameter by its key.
    *
-   * <p>Return the first value inside the list of values for the query parameter.</p>
+   * <p>Return the first value inside the list of values for the query parameter.
    *
-   * <p>{@code String id = ctx.query("id");}</p>
+   * <p>{@code String id = ctx.query("id");}
    *
    * @param key The query key
    * @return The first value for the header, or an empty string if the key does not exist
@@ -101,7 +104,7 @@ public class LevtusContext {
   /**
    * Retrieves the value - a List of String - of a specific query parameter by its key.
    *
-   * <p>{@code ArrayList<String> tag = ctx.queries("tag");}</p>
+   * <p>{@code ArrayList<String> tag = ctx.queries("tag");}
    *
    * @param name the name of the query parameter
    * @return the query parameter value, or an empty string if not found
@@ -113,7 +116,7 @@ public class LevtusContext {
   /**
    * Retrieves the complete map of parsed URL query parameters.
    *
-   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queries();}</p>
+   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queries();}
    *
    * @return a map of query parameters
    */
@@ -125,7 +128,7 @@ public class LevtusContext {
    * Retrieves the first value associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code String accepts = ctx.header("Accept");}</p>
+   * <p>{@code String accepts = ctx.header("Accept");}
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -138,7 +141,7 @@ public class LevtusContext {
    * Retrieves all values associated with a specific HTTP header. Header name resolution is
    * case-insensitive.
    *
-   * <p>{@code List<String> accepts = ctx.headers("Accept");}</p>
+   * <p>{@code List<String> accepts = ctx.headers("Accept");}
    *
    * @param name the target header name (must not be null)
    * @return a list of header values, or an empty list if the header is not present
@@ -150,7 +153,7 @@ public class LevtusContext {
   /**
    * Retrieves the complete map of HTTP headers associated with this request.
    *
-   * <p>{@code HashMap<String, List<String>> headers = ctx.headers();}</p>
+   * <p>{@code HashMap<String, List<String>> headers = ctx.headers();}
    *
    * @return an unmodifiable map of headers
    */
@@ -164,7 +167,7 @@ public class LevtusContext {
    * @param code the 3-digit HTTP status code
    * @return The current LevtusContext instance for method chaining
    */
-  public LevtusContext status(int code){
+  public LevtusContext status(int code) {
     res.status(code);
     return this;
   }
@@ -207,7 +210,7 @@ public class LevtusContext {
   /**
    * Merges a map of headers into the existing response headers.
    *
-   * <p>Overwrites existing keys but preserves unique existing headers.</p>
+   * <p>Overwrites existing keys but preserves unique existing headers.
    *
    * @param headers the full Map of headers
    * @return The current LevtusContext instance for method chaining

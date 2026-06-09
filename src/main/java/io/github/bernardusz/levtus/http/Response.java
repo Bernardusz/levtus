@@ -92,13 +92,14 @@ public class Response {
   /**
    * Merges a map of headers into the existing response headers.
    *
-   * <p>Overwrites existing keys but preserves unique existing headers.</p>
+   * <p>Overwrites existing keys but preserves unique existing headers.
    *
    * @param headers the full Map of headers
    * @return the current Response instance for method chaining
    */
   public Response headers(Map<String, List<String>> headers) {
-    this.headers.putAll(headers); // We do this because we want batch-config by user to be authoritative
+    this.headers.putAll(
+        headers); // We do this because we want batch-config by user to be authoritative
     return this;
   }
 

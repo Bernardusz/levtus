@@ -63,7 +63,8 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
         serverSocketFactory = ServerSocketFactory.getDefault();
 
       } else {
-        throw new IllegalArgumentException("Both keystorePath and keystorePass must be provided for SSL, or both must be null for plain HTTP");
+        throw new IllegalArgumentException(
+            "Both keystorePath and keystorePass must be provided for SSL, or both must be null for plain HTTP");
       }
 
       return serverSocketFactory.createServerSocket(port);

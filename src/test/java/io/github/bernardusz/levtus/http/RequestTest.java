@@ -20,15 +20,14 @@ class RequestTest {
   }
 
   @Test
-  void testSingleValueQueries(){
+  void testSingleValueQueries() {
     Map<String, List<String>> queries =
-      Map.of(
-        "tag", List.of("java", "web"),
-        "id", List.of("123"));
+        Map.of(
+            "tag", List.of("java", "web"),
+            "id", List.of("123"));
 
     Request request =
-      new Request(
-        "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+        new Request("GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
 
     assertEquals("java", request.query("tag"));
     assertEquals("123", request.query("id"));
@@ -43,8 +42,7 @@ class RequestTest {
             "id", List.of("123"));
 
     Request request =
-        new Request(
-            "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+        new Request("GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
 
     assertEquals(List.of("java", "web"), request.queries("tag"));
     assertEquals(List.of("123"), request.queries("id"));
@@ -53,15 +51,14 @@ class RequestTest {
   }
 
   @Test
-  void testSingleHeaderValue(){
+  void testSingleHeaderValue() {
     Map<String, List<String>> headers =
-      Map.of(
-        "content-type", List.of("application/json"),
-        "x-custom", List.of("value1", "value2"));
+        Map.of(
+            "content-type", List.of("application/json"),
+            "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request(
-        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+        new Request("GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
 
     assertEquals("application/json", request.header("Content-Type"));
     assertEquals("value1", request.header("X-Custom"));

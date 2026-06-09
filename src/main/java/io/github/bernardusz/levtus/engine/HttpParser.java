@@ -286,12 +286,11 @@ class HttpParser {
     }
 
     // Strip domain name
-    if (!rawPath.startsWith("/")){
+    if (!rawPath.startsWith("/")) {
       int firstSlash = rawPath.indexOf("/");
-      if (firstSlash != -1){
+      if (firstSlash != -1) {
         rawPath = rawPath.substring(firstSlash);
-      }
-      else  {
+      } else {
         rawPath = "/";
       }
     }

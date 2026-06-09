@@ -10,18 +10,16 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class ResponseTest {
 
-  private BufferedOutputStream mockOutput;
-  private Response response;
-
   @TempDir
   Path tempDir;
+  private BufferedOutputStream mockOutput;
+  private Response response;
 
   @BeforeEach
   void setUp() {
