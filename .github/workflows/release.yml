@@ -19,14 +19,18 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           server-id: central
-          server-username: ${{ secrets.CENTRAL_USERNAME }}
-          server-password: ${{ secrets.CENTRAL_PASSWORD }}
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Build and Test
         run: mvn clean verify
 
       - name: Publish to Central Portal
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mvn deploy -P release "-Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}"
+        run: mvn deploy -P release
