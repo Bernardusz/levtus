@@ -29,7 +29,4 @@ jobs:
 
       - name: Publish to Central Portal
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mvn deploy -P release "-Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}"
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        run: mvn deploy -P release "-Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}" -DpublishingServerId=central
