@@ -296,10 +296,6 @@ class HttpParser {
       }
     }
 
-    if (rawPath.isEmpty() || !rawPath.contains("/")) {
-      rawPath = "/";
-    }
-
     return rawPath;
   }
 

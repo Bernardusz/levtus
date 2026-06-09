@@ -62,10 +62,8 @@ public record SecurityConfig(String keystorePath, String keystorePass) {
       } else if (keystorePath == null && keystorePass == null) {
         serverSocketFactory = ServerSocketFactory.getDefault();
 
-      } else if (keystorePass == null) {
-        throw new java.security.NoSuchAlgorithmException("keystorePass is null");
-      } else if (keystorePath == null) {
-        throw new java.security.NoSuchAlgorithmException("keystorePath is null");
+      } else {
+        throw new IllegalArgumentException("Both keystorePath and keystorePass must be provided for SSL, or both must be null for plain HTTP");
       }
 
       return serverSocketFactory.createServerSocket(port);

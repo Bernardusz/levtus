@@ -1,6 +1,8 @@
 package io.github.bernardusz.levtus.routing;
 
 import io.github.bernardusz.levtus.http.LevtusContext;
+import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
 
 /**
  * A functional interface representing an interceptor that can process HTTP requests before they
@@ -16,7 +18,7 @@ import io.github.bernardusz.levtus.http.LevtusContext;
  *       {@code next.run()}.
  *   <li>Short-circuit the request by sending a response directly and <b>not</b> calling {@code
  *       next.run()}.
- *   <li>Execution link: {@link Router#handle(LevtusContext)}
+ *   <li>Execution link: {@link Router#handle(Request, Response)}
  * </ul>
  *
  * <p>Example usage:
