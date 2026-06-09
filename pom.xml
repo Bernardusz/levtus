@@ -107,7 +107,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>3.5.5</version>
+                <configuration>
+                    <!-- Increase heap memory (-Xmx) and Metaspace if needed -->
+                    <!-- The -javaagent line resolves the Mockito self-attaching warning -->
+                    <argLine>
+                        -Xmx2g
+                        -XX:+EnableDynamicAgentLoading
+                        -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.17.7/byte-buddy-agent-1.17.7.jar
+                    </argLine>
+                </configuration>
             </plugin>
 
             <!-- Source JAR generation -->
@@ -138,6 +147,15 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <tags>
+                        <tag>
+                            <name>implNote</name>
+                            <placement>a</placement>
+                            <head>Implementation Note:</head>
+                        </tag>
+                    </tags>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -1,27 +1,46 @@
 package io.github.bernardusz.levtus.http;
 
+import java.util.List;
 import java.util.Map;
 
-/** The type Levtus context, a wrapper for Request and Response. */
+/**
+ * The LevtusContext that wraps HTTP Requests and Output Stream as {@link Request} and {@link Response}.
+ *
+ * <p>Responsible for:</p>
+ * <ul>
+ *   <li>Wrapping HTTP Requests and Output Stream</li>
+ *   <li>Handling and providing access to Path Parameters</li>
+ *   <li>Handling Query Parameters</li>
+ *   <li>Handling Request Body</li>
+ *   <li>Handling Response transmission</li>
+ * </ul>
+ * @author Bernardusz
+ * @version 0.1.1
+ */
 public class LevtusContext {
-  /** The Request object of the context. */
-  Request req;
+  /** The Request object that represents an incoming HTTP/1.1 request. */
+  final Request req;
 
-  /** The Response object of the context. */
-  Response res;
-
-  /** The Path params. */
-  Map<String, String> pathParams;
+  /** The fully instantiated Response object that represents an outgoing HTTP/1.1 response. */
+  final Response res;
 
   /**
-   * Instantiates a new Levtus context.
-   *
-   * @param req the req
-   * @param res the res
+   * The path parameters extracted from the URI based on the route pattern (wildcards).
+   * For example, in a route "/users/{id}", the value of "{id}" is stored here.
    */
-  public LevtusContext(Request req, Response res) {
+  final Map<String, String> pathParams;
+
+  /**
+   * Instantiates a new LevtusContext, setting the Request, Response, and Path Parameters.
+   *
+   * @param req the incoming request
+   * @param res the outgoing response
+   * @param pathParams the extracted path parameters
+   */
+  public LevtusContext(Request req, Response res, Map<String, String> pathParams) {
     this.req = req;
     this.res = res;
+    this.pathParams = pathParams != null ? Map.copyOf(pathParams) : Map.of();
   }
 
   /**
@@ -43,59 +62,186 @@ public class LevtusContext {
   }
 
   /**
-   * Sets path params.
+   * Retrieves the value of a path parameter (wildcard) by its name.
    *
-   * @param pathParams the path params
-   */
-  public void setPathParams(Map<String, String> pathParams) {
-    this.pathParams = pathParams;
-  }
-
-  /**
-   * Param string.
+   * <p>{@code String userId = ctx.param("id");}
    *
-   * @param name the name
-   * @return the string
+   * @param name the name of the path parameter (defined in the route pattern)
+   * @return the parameter value, or an empty string if not found
    */
   public String param(String name) {
-    return pathParams != null ? pathParams.getOrDefault(name, "") : "";
+    return pathParams.getOrDefault(name, "");
   }
 
   /**
-   * Query string.
+   * Retrieves all the value of path parameters (wildcard).
    *
-   * @param name the name
-   * @return the string
+   * <p>{@code HashMap<String, String> params = ctx.params();}
+   *
+   * @return the map
    */
-  public String query(String name) {
-    return req.query(name);
+  public Map<String, String> params() {
+    return pathParams != null ? pathParams : Map.of();
   }
 
   /**
-   * Send.
+   * Retrieves the value - a String - of a specific query parameter by its key.
    *
-   * @param data the data
+   * <p>Return the first value inside the list of values for the query parameter.</p>
+   *
+   * <p>{@code String id = ctx.query("id");}</p>
+   *
+   * @param key The query key
+   * @return The first value for the header, or an empty string if the key does not exist
+   */
+  public String query(String key) {
+    return req.query(key);
+  }
+
+  /**
+   * Retrieves the value - a List of String - of a specific query parameter by its key.
+   *
+   * <p>{@code ArrayList<String> tag = ctx.queries("tag");}</p>
+   *
+   * @param name the name of the query parameter
+   * @return the query parameter value, or an empty string if not found
+   */
+  public List<String> queries(String name) {
+    return req.queries(name);
+  }
+
+  /**
+   * Retrieves the complete map of parsed URL query parameters.
+   *
+   * <p>{@code HashMap<String, List<String>> queryParams = ctx.queries();}</p>
+   *
+   * @return a map of query parameters
+   */
+  public Map<String, List<String>> queries() {
+    return req.queries();
+  }
+
+  /**
+   * Retrieves the first value associated with a specific HTTP header. Header name resolution is
+   * case-insensitive.
+   *
+   * <p>{@code String accepts = ctx.header("Accept");}</p>
+   *
+   * @param name the target header name (must not be null)
+   * @return a list of header values, or an empty list if the header is not present
+   */
+  public String header(String name) {
+    return req.header(name);
+  }
+
+  /**
+   * Retrieves all values associated with a specific HTTP header. Header name resolution is
+   * case-insensitive.
+   *
+   * <p>{@code List<String> accepts = ctx.headers("Accept");}</p>
+   *
+   * @param name the target header name (must not be null)
+   * @return a list of header values, or an empty list if the header is not present
+   */
+  public List<String> headers(String name) {
+    return req.headers(name);
+  }
+
+  /**
+   * Retrieves the complete map of HTTP headers associated with this request.
+   *
+   * <p>{@code HashMap<String, List<String>> headers = ctx.headers();}</p>
+   *
+   * @return an unmodifiable map of headers
+   */
+  public Map<String, List<String>> headers() {
+    return req.headers();
+  }
+
+  /**
+   * Sets the HTTP response status code
+   *
+   * @param code the 3-digit HTTP status code
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext status(int code){
+    res.status(code);
+    return this;
+  }
+
+  /**
+   * Overrides the "Content-Type" header for the outgoing response.
+   *
+   * @param type the MIME type string (e.g., "application/json", "text/html") (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext contentType(String type) {
+    res.contentType(type);
+    return this;
+  }
+
+  /**
+   * Sets a header, replacing any existing value(s) for this header name.
+   *
+   * @param name the header name (must not be null)
+   * @param value the header value (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext header(String name, String value) {
+    res.header(name, value);
+    return this;
+  }
+
+  /**
+   * Sets a multi-value header, replacing any existing list for this header name.
+   *
+   * @param name the header name (must not be null)
+   * @param values the header values (must not be null)
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext headers(String name, List<String> values) {
+    res.headers(name, values);
+    return this;
+  }
+
+  /**
+   * Merges a map of headers into the existing response headers.
+   *
+   * <p>Overwrites existing keys but preserves unique existing headers.</p>
+   *
+   * @param headers the full Map of headers
+   * @return The current LevtusContext instance for method chaining
+   */
+  public LevtusContext headers(Map<String, List<String>> headers) {
+    res.headers(headers);
+    return this;
+  }
+
+  /**
+   * Send a plain String as data (text/plain) through the Response.
+   *
+   * @param data the string data to send
    */
   public void send(String data) {
     res.send(data);
   }
 
   /**
-   * Send.
+   * Send a plain String as data (text/plain) through the Response with a custom status code.
    *
-   * @param code the code
-   * @param data the data
+   * @param code the HTTP status code
+   * @param data the string data to send
    */
   public void send(int code, String data) {
     res.status(code).send(data);
   }
 
   /**
-   * Send.
+   * Send a plain String as data through the Response with a custom status code and content type.
    *
-   * @param code the code
-   * @param contentType the content type
-   * @param data the data
+   * @param code the HTTP status code
+   * @param contentType the MIME type of the content (e.g., "application/json")
+   * @param data the string data to send
    */
   public void send(int code, String contentType, String data) {
     res.status(code).contentType(contentType);
@@ -103,7 +249,7 @@ public class LevtusContext {
   }
 
   /**
-   * Html.
+   * Send an HTML String as data (text/html) through the Response.
    *
    * @param html the html
    */
@@ -112,7 +258,7 @@ public class LevtusContext {
   }
 
   /**
-   * Text.
+   * Send a plain String as data (text/plain) through the Response.
    *
    * @param text the text
    */
@@ -121,7 +267,7 @@ public class LevtusContext {
   }
 
   /**
-   * Send binary.
+   * Send a binary array as data (application/octet-stream) through the Response.
    *
    * @param body the body
    */
@@ -130,7 +276,7 @@ public class LevtusContext {
   }
 
   /**
-   * Send the body of the response (String JSON).
+   * Send a JSON String as data (application/json) through the Response.
    *
    * @param json the String JSON
    */
@@ -139,7 +285,7 @@ public class LevtusContext {
   }
 
   /**
-   * Send the body of the response (HTML file).
+   * Send an HTML file as data (text/html) through the Response.
    *
    * @param htmlPath the path of HTML file
    */

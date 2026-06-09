@@ -1,11 +1,19 @@
 package io.github.bernardusz.levtus.exception;
 
-/** The type Payload too large exception. */
+/**
+ * Exception thrown when client sends a request with payload/body that exceeds payload size.
+ *
+ * <p>Configuration in {@link io.github.bernardusz.levtus.engine.LevtusEngine}.
+ *
+ * <p>Results in an HTTP {@code 413 Content Too Large} response. Extended from: {@link
+ * LevtusHttpException}
+ */
 public class PayloadTooLargeException extends LevtusHttpException {
   /**
-   * Instantiates a new Payload too large exception.
+   * Constructs a new {@code PayloadTooLargeException} with the specified message and the status
+   * code of 413.
    *
-   * @param message the message
+   * @param message the detail message explaining the error
    */
   public PayloadTooLargeException(String message) {
     super(message, 413);

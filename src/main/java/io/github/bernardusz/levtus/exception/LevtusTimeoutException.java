@@ -1,11 +1,17 @@
 package io.github.bernardusz.levtus.exception;
 
-/** The type Levtus timeout exception. */
+/**
+ * Exception thrown when a client takes too long to complete a response (Socket timeout).
+ *
+ * <p>Results in an HTTP {@code 408 Request Timeout} response. Extended from: {@link
+ * LevtusHttpException}
+ */
 public class LevtusTimeoutException extends LevtusHttpException {
   /**
-   * Instantiates a new Levtus timeout exception.
+   * Constructs a new {@code LevtusTimeoutException} with the specified message and the status code
+   * of 408.
    *
-   * @param message the message
+   * @param message the detail message explaining the error
    */
   public LevtusTimeoutException(String message) {
     super(message, 408);
