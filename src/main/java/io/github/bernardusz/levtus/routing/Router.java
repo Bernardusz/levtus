@@ -49,8 +49,9 @@ public class Router {
    * @param method the HTTP method
    * @param path the path of the route
    * @param handler the handler/lambda of the route
+   * @return the matched or created terminal Node
    */
-  public void addRoute(String method, String path, Consumer<LevtusContext> handler) {
+  public Node addRoute(String method, String path, Consumer<LevtusContext> handler) {
     Node current = root.children.computeIfAbsent(method.toUpperCase(), k -> new Node());
     for (String segment : path.split("/")) {
       if (segment.isEmpty()) continue;
@@ -71,6 +72,34 @@ public class Router {
       }
     }
     current.handler = handler;
+    return current;
+  }
+
+  /**
+   * Matches a route based on HTTP method and normalized path.
+   *
+   * @param method the HTTP method
+   * @param path the normalized path
+   * @return the matching Node if found and has a handler, otherwise null
+   */
+  public Node matchRoute(String method, String path) {
+    Node current = root.children.get(method.toUpperCase());
+    if (current == null) {
+      return null;
+    }
+    for (String segment : path.split("/")) {
+      if (segment.isEmpty()) continue;
+      segment = utf8Decoder(segment);
+      String upperSegment = segment.toUpperCase();
+      if (current.children.containsKey(upperSegment)) {
+        current = current.children.get(upperSegment);
+      } else if (current.wildcardChild != null) {
+        current = current.wildcardChild;
+      } else {
+        return null;
+      }
+    }
+    return current.handler != null ? current : null;
   }
 
   /**
@@ -158,9 +187,10 @@ public class Router {
    *
    * @param path the path
    * @param handler the handler
+   * @return the registered Node
    */
-  public void get(String path, Consumer<LevtusContext> handler) {
-    addRoute("GET", path, handler);
+  public Node get(String path, Consumer<LevtusContext> handler) {
+    return addRoute("GET", path, handler);
   }
 
   /**
@@ -170,9 +200,10 @@ public class Router {
    *
    * @param path the path
    * @param handler the handler
+   * @return the registered Node
    */
-  public void post(String path, Consumer<LevtusContext> handler) {
-    addRoute("POST", path, handler);
+  public Node post(String path, Consumer<LevtusContext> handler) {
+    return addRoute("POST", path, handler);
   }
 
   /**
@@ -182,9 +213,10 @@ public class Router {
    *
    * @param path the path
    * @param handler the handler
+   * @return the registered Node
    */
-  public void put(String path, Consumer<LevtusContext> handler) {
-    addRoute("PUT", path, handler);
+  public Node put(String path, Consumer<LevtusContext> handler) {
+    return addRoute("PUT", path, handler);
   }
 
   /**
@@ -194,9 +226,10 @@ public class Router {
    *
    * @param path the path
    * @param handler the handler
+   * @return the registered Node
    */
-  public void delete(String path, Consumer<LevtusContext> handler) {
-    addRoute("DELETE", path, handler);
+  public Node delete(String path, Consumer<LevtusContext> handler) {
+    return addRoute("DELETE", path, handler);
   }
 
   /**

@@ -20,7 +20,7 @@ public class Request {
   private final Map<String, List<String>> headers;
   private final Map<String, List<String>> queries;
   private final InputStream bodyStream;
-  private final int maxBodySize;
+  private final long maxBodySize;
   private byte[] cachedBody;
   private int bytesRead;
 
@@ -42,7 +42,7 @@ public class Request {
       Map<String, List<String>> headers,
       Map<String, List<String>> queries,
       InputStream bodyStream,
-      int maxBodySize) {
+      long maxBodySize) {
     this.method = method;
     this.path = path;
     this.headers = headers;
