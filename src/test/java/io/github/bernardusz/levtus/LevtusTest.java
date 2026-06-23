@@ -6,8 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -42,15 +45,13 @@ class LevtusTest {
     Thread serverThread =
         Thread.ofVirtual()
             .start(
-                () -> {
-                  app.listen(port);
-                });
+              () -> app.listen(port));
 
     // Give the server a moment to bind to the socket
     Thread.sleep(500);
 
     try {
-      URL url = new URL("http://localhost:" + port + "/test");
+      URL url = new URI("http://localhost:" + port + "/test").toURL();
       HttpURLConnection connection = (HttpURLConnection) url.openConnection();
       connection.setRequestMethod("GET");
 
@@ -75,7 +76,7 @@ class LevtusTest {
     AtomicBoolean middlewareHit = new AtomicBoolean(false);
 
     app.use(
-        (ctx, next) -> {
+        (_, next) -> {
           middlewareHit.set(true);
           next.run();
         });
@@ -86,17 +87,74 @@ class LevtusTest {
     Thread serverThread =
         Thread.ofVirtual()
             .start(
-                () -> {
-                  app.listen(port);
-                });
+                () -> app.listen(port));
 
     Thread.sleep(500);
 
     try {
-      URL url = new URL("http://localhost:" + port + "/middleware");
+      URL url = new URI("http://localhost:" + port + "/middleware").toURL();
       HttpURLConnection connection = (HttpURLConnection) url.openConnection();
       assertEquals(200, connection.getResponseCode());
       assertTrue(middlewareHit.get(), "Middleware should have been executed");
+    } finally {
+      serverThread.interrupt();
+    }
+  }
+
+  @Test
+  void testRouteSpecificMaxBodySizeIntegration() throws Exception {
+    Levtus app = Levtus.create();
+    app.maxBodySize(10); // global limit 10 bytes
+    app.post("/large", ctx -> ctx.text("ok")).limit(100); // route limit 100 bytes
+    app.post("/small", ctx -> ctx.text("ok")).limit(50);
+    app.post("/default", ctx -> ctx.text("ok"));
+
+    int port = 9091;
+    Thread serverThread =
+      Thread.ofVirtual()
+        .start(
+          () -> app.listen(port));
+
+    Thread.sleep(500);
+
+    try {
+      // Scenario 1: Sending 20 bytes to /large (Limit is 100) -> Should Pass (200 OK)
+      URL urlLarge = new URI("http://localhost:" + port + "/large").toURL();
+      HttpURLConnection connLarge = (HttpURLConnection) urlLarge.openConnection();
+      connLarge.setRequestMethod("POST");
+      connLarge.setDoOutput(true);
+
+      byte[] body20Bytes = "12345678901234567890".getBytes(StandardCharsets.UTF_8);
+      try (OutputStream os = connLarge.getOutputStream()) {
+        os.write(body20Bytes);
+      }
+      assertEquals(200, connLarge.getResponseCode(), "Should allow 20 bytes on a 100-byte limit route");
+
+      // Scenario 2: Sending 60 bytes to /small (Limit is 50) -> Should Fail (e.g., 413 Payload Too Large)
+      URL urlSmall = new URI("http://localhost:" + port + "/small").toURL();
+      HttpURLConnection connSmall = (HttpURLConnection) urlSmall.openConnection();
+      connSmall.setRequestMethod("POST");
+      connSmall.setDoOutput(true);
+
+      byte[] body60Bytes = "A".repeat(60).getBytes(StandardCharsets.UTF_8);
+      try (OutputStream os = connSmall.getOutputStream()) {
+        os.write(body60Bytes);
+      }
+      // Adjust the expected status code (413) based on what your Levtus framework returns
+      assertEquals(413, connSmall.getResponseCode(), "Should block 60 bytes on a 50-byte limit route");
+
+      // Scenario 3: Sending 15 bytes to /default (Fallback to global limit 10) -> Should Fail (413)
+      URL urlDefault = new URI("http://localhost:" + port + "/default").toURL();
+      HttpURLConnection connDefault = (HttpURLConnection) urlDefault.openConnection();
+      connDefault.setRequestMethod("POST");
+      connDefault.setDoOutput(true);
+
+      byte[] body15Bytes = "123456789012345".getBytes(StandardCharsets.UTF_8);
+      try (OutputStream os = connDefault.getOutputStream()) {
+        os.write(body15Bytes);
+      }
+      assertEquals(413, connDefault.getResponseCode(), "Should block 15 bytes on a 10-byte global limit route");
+
     } finally {
       serverThread.interrupt();
     }
@@ -113,5 +171,14 @@ class LevtusTest {
         .maxLineSize(4096)
         .maxEmptyLines(3)
         .staticFiles("public");
+  }
+
+  @Test
+  void testFluentLimitBodySize(){
+    Levtus app = Levtus.create();
+
+    assertEquals(200,
+      app.post("/", ctx -> ctx.text("ok")).limit(200).getMaxBodySize()
+    );
   }
 }

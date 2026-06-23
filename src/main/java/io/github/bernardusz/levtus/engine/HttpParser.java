@@ -5,6 +5,8 @@ import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
 import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
 import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.routing.Node;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,9 +75,6 @@ class HttpParser {
     Map<String, List<String>> headers =
         parseHeaders(inputStream, handler.getMaxHeaderSize(), handler.getMaxHeaderCount());
 
-    // Parse the Body
-    validateBodySize(headers, handler.getMaxBodySize());
-
     // Parse the Path
     String rawPath = parseRawPath(requestLine);
 
@@ -95,6 +94,14 @@ class HttpParser {
 
     Map<String, List<String>> queryParams = parseQueryParams(uri.getRawQuery());
     String normalizedPath = normalizePath(decodedPath);
+
+    // Parse the Body
+    long limit = handler.getMaxBodySize();
+    Node matchedNode = handler.router.matchRoute(method, normalizedPath);
+    if (matchedNode != null && matchedNode.getMaxBodySize() != -1){
+      limit = matchedNode.getMaxBodySize();
+    }
+    validateBodySize(headers, limit);
 
     return new Request(
         method, normalizedPath, headers, queryParams, inputStream, handler.getMaxBodySize());
@@ -219,7 +226,7 @@ class HttpParser {
    *     LevtusEngine#getMaxBodySize()} or {@link HttpConnectionHandler#getMaxBodySize()}.
    * @throws BadRequestException if more than one Content-Length header is present
    */
-  void validateBodySize(Map<String, List<String>> headers, int maxBodySize)
+  void validateBodySize(Map<String, List<String>> headers, long maxBodySize)
       throws PayloadTooLargeException, BadRequestException {
     int contentLength;
     List<String> lengthStrList =

@@ -3,6 +3,7 @@ package io.github.bernardusz.levtus;
 import io.github.bernardusz.levtus.engine.LevtusEngine;
 import io.github.bernardusz.levtus.http.LevtusContext;
 import io.github.bernardusz.levtus.routing.Middleware;
+import io.github.bernardusz.levtus.routing.Node;
 import io.github.bernardusz.levtus.routing.Router;
 import java.util.function.Consumer;
 
@@ -44,9 +45,10 @@ public class Levtus {
    *
    * @param path the exact URL path to match (must not be null, e.g., "/api/users")
    * @param handler the functional callback executed upon a successful match (must not be null)
+   * @return the registered route Node
    */
-  public void get(String path, Consumer<LevtusContext> handler) {
-    router.get(path, handler);
+  public Node get(String path, Consumer<LevtusContext> handler) {
+    return router.get(path, handler);
   }
 
   /**
@@ -56,9 +58,10 @@ public class Levtus {
    *
    * @param path the exact URL path to match (must not be null)
    * @param handler the functional callback executed upon a successful match (must not be null)
+   * @return the registered route Node
    */
-  public void post(String path, Consumer<LevtusContext> handler) {
-    router.post(path, handler);
+  public Node post(String path, Consumer<LevtusContext> handler) {
+    return router.post(path, handler);
   }
 
   /**
@@ -66,9 +69,10 @@ public class Levtus {
    *
    * @param path the exact URL path to match (must not be null)
    * @param handler the functional callback executed upon a successful match (must not be null)
+   * @return the registered route Node
    */
-  public void put(String path, Consumer<LevtusContext> handler) {
-    router.put(path, handler);
+  public Node put(String path, Consumer<LevtusContext> handler) {
+    return router.put(path, handler);
   }
 
   /**
@@ -76,9 +80,10 @@ public class Levtus {
    *
    * @param path the exact URL path to match (must not be null)
    * @param handler the functional callback executed upon a successful match (must not be null)
+   * @return the registered route Node
    */
-  public void delete(String path, Consumer<LevtusContext> handler) {
-    router.delete(path, handler);
+  public Node delete(String path, Consumer<LevtusContext> handler) {
+    return router.delete(path, handler);
   }
 
   /**
