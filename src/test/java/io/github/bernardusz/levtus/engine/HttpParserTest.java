@@ -1,6 +1,7 @@
 package io.github.bernardusz.levtus.engine;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import io.github.bernardusz.levtus.exception.http.BadRequestException;
@@ -8,8 +9,8 @@ import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
 import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
-
-import java.io.BufferedInputStream;
+import io.github.bernardusz.levtus.http.Response;
+import io.github.bernardusz.levtus.routing.Router;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,10 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import io.github.bernardusz.levtus.http.Response;
-import io.github.bernardusz.levtus.routing.Router;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +30,6 @@ class HttpParserTest {
   private HttpConnectionHandler handler;
   private HttpParser parser;
   private Router router;
-//  @Mock private Request mockRequest;
   @Mock private Response mockResponse;
 
   @BeforeEach
@@ -56,7 +52,7 @@ class HttpParserTest {
   void testReadLine() throws IOException {
     InputStream mockInputStream = Mockito.mock(InputStream.class);
     // Standard HTTP newline is \r\n (13, 10)
-    Mockito.when(mockInputStream.read()).thenReturn(10, 13, -1);
+    when(mockInputStream.read()).thenReturn(10, 13, -1);
 
     String line = parser.readLine(mockInputStream, 10);
     assertEquals("", line); // Empty string for a blank line (no newline - \n)
@@ -65,7 +61,7 @@ class HttpParserTest {
     assertNull(secondLine); // null for end of stream
 
     InputStream mockInputStream2 = Mockito.mock(InputStream.class);
-    Mockito.when(mockInputStream2.read()).thenReturn((int) 'G', 13, 10, -1);
+    when(mockInputStream2.read()).thenReturn((int) 'G', 13, 10, -1);
 
     String line2 = parser.readLine(mockInputStream2, 10);
     assertEquals("G", line2);
@@ -75,7 +71,7 @@ class HttpParserTest {
   void testReadLineTooLarge() throws IOException {
     InputStream mockInputStream = Mockito.mock(InputStream.class);
     // Return 'A' indefinitely to exceed the limit
-    Mockito.when(mockInputStream.read()).thenReturn((int) 'A');
+    when(mockInputStream.read()).thenReturn((int) 'A');
 
     assertThrows(
         HeaderTooLargeException.class,
@@ -249,7 +245,7 @@ class HttpParserTest {
     headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
-    assertDoesNotThrow(() -> parser.validateBodySize(headers, 10 * 1024 * 1024));
+    assertDoesNotThrow(() -> parser.validateBodySize(headers, 10 * 1024 * 1024, mockResponse));
   }
 
   @Test
@@ -262,7 +258,7 @@ class HttpParserTest {
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
     assertThrows(
-        BadRequestException.class, () -> parser.validateBodySize(headers, 10 * 1024 * 1024));
+        BadRequestException.class, () -> parser.validateBodySize(headers, 10 * 1024 * 1024, mockResponse));
   }
 
   @Test
@@ -274,7 +270,7 @@ class HttpParserTest {
     headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
-    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10));
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
   }
 
   @Test
@@ -286,9 +282,40 @@ class HttpParserTest {
     headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
-    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10));
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
   }
 
+  @Test
+  void testValidateBodySize100Continue(){
+    Map<String, List<String>> headers = new HashMap<>();
+
+    headers.put("Host".toLowerCase().trim(), List.of("localhost:8080".trim()));
+    headers.put("User-Agent".toLowerCase().trim(), List.of("Mozilla/5.0".trim()));
+    headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
+    headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
+    headers.put("Expect".toLowerCase().trim(), List.of("100-continue".trim()));
+
+    when(mockResponse.status(anyInt())).thenReturn(mockResponse);
+
+    assertDoesNotThrow(() -> parser.validateBodySize(headers, 20, mockResponse));
+    verify(mockResponse).status(100);
+    verify(mockResponse).send();
+  }
+
+  @Test
+  void testValidateBodySize100ContinueNotCalled(){
+    Map<String, List<String>> headers = new HashMap<>();
+
+    headers.put("Host".toLowerCase().trim(), List.of("localhost:8080".trim()));
+    headers.put("User-Agent".toLowerCase().trim(), List.of("Mozilla/5.0".trim()));
+    headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
+    headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
+    headers.put("Expect".toLowerCase().trim(), List.of("100-continue".trim()));
+
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
+    verify(mockResponse, never()).status(100);
+    verify(mockResponse, never()).send();
+  }
 
   @Test
   void testParseRawPath() {
@@ -400,7 +427,7 @@ class HttpParserTest {
     InputStream inputStream =
         new ByteArrayInputStream(fullRequest.getBytes(StandardCharsets.UTF_8));
 
-    Request request = parser.parseRequest(handler, inputStream);
+    Request request = parser.parseRequest(handler, inputStream, mockResponse);
 
     assertNotNull(request);
     assertEquals("GET", request.method());
@@ -424,7 +451,7 @@ class HttpParserTest {
 
     assertDoesNotThrow( // default is 8192
       () -> {
-        parser.parseRequest(handler, inputStream);
+        parser.parseRequest(handler, inputStream, mockResponse);
       }
     );
   }
@@ -442,7 +469,7 @@ class HttpParserTest {
 
     router.post("/", ctx -> {}).limit(0);
 
-    assertThrows(PayloadTooLargeException.class, () -> parser.parseRequest(handler, inputStream));
+    assertThrows(PayloadTooLargeException.class, () -> parser.parseRequest(handler, inputStream, mockResponse));
   }
 
   @Test
@@ -450,23 +477,23 @@ class HttpParserTest {
     // 1. Encoded traversal: %2e%2e -> ..
     String validEncoded = "GET /foo/%2e%2e/bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is1 = new ByteArrayInputStream(validEncoded.getBytes(StandardCharsets.UTF_8));
-    Request req1 = parser.parseRequest(handler, is1);
+    Request req1 = parser.parseRequest(handler, is1, mockResponse);
     assertEquals("/bar", req1.path());
 
     // 2. Malicious encoded traversal
     String malEncoded = "GET /%2e%2e/etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is2 = new ByteArrayInputStream(malEncoded.getBytes(StandardCharsets.UTF_8));
-    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is2));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is2, mockResponse));
 
     // 3. Encoded slash: %2f -> /
     String encodedSlash = "GET /foo%2fbar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is3 = new ByteArrayInputStream(encodedSlash.getBytes(StandardCharsets.UTF_8));
-    Request req3 = parser.parseRequest(handler, is3);
+    Request req3 = parser.parseRequest(handler, is3, mockResponse);
     assertEquals("/foo/bar", req3.path());
 
     // 4. Null byte: %00
     String nullByteRequest = "GET /foo%00bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is4 = new ByteArrayInputStream(nullByteRequest.getBytes(StandardCharsets.UTF_8));
-    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is4));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is4, mockResponse));
   }
 }
