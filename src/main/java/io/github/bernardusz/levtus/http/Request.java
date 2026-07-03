@@ -1,10 +1,14 @@
 package io.github.bernardusz.levtus.http;
 
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
-import java.io.ByteArrayOutputStream;
+import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
+import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
+import io.github.bernardusz.levtus.io.LevtusInputStream;
+import io.github.bernardusz.levtus.io.StreamConsumer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -22,19 +26,20 @@ public class Request {
   private final InputStream bodyStream;
   private final long maxBodySize;
   private byte[] cachedBody;
-  private int bytesRead;
+  private LevtusInputStream activeStream;
+  private boolean streamConsumed = false;
 
   /**
    * Initializes the internal state of an incoming request.
    *
-   * @implNote This constructor is primarily used internally by the Levtus engine during the HTTP
-   *     parsing phase.
-   * @param method the HTTP method (e.g., "GET", "POST") (must not be null)
-   * @param path the requested URI path (must not be null)
-   * @param headers a map of HTTP headers, where keys are strictly lowercase (must not be null)
-   * @param queries a map of parsed query List of String parameters (must not be null)
-   * @param bodyStream the raw input stream from the client socket (must not be null)
+   * @param method      the HTTP method (e.g., "GET", "POST") (must not be null)
+   * @param path        the requested URI path (must not be null)
+   * @param headers     a map of HTTP headers, where keys are strictly lowercase (must not be null)
+   * @param queries     a map of parsed query List of String parameters (must not be null)
+   * @param bodyStream  the raw input stream from the client socket (must not be null)
    * @param maxBodySize the configured absolute byte limit for the payload
+   * @implNote This constructor is primarily used internally by the Levtus engine during the HTTP
+   * parsing phase.
    */
   public Request(
       String method,
@@ -154,24 +159,6 @@ public class Request {
   }
 
   /**
-   * Retrieves the total number of body bytes successfully read from the client stream so far.
-   *
-   * @return the current count of bytes read
-   */
-  public int bytesRead() {
-    return bytesRead;
-  }
-
-  /**
-   * Updates the internal counter tracking how many body bytes have been read.
-   *
-   * @param bytesRead the new byte count to set
-   */
-  public void setBytesRead(int bytesRead) {
-    this.bytesRead = bytesRead;
-  }
-
-  /**
    * Determines the MIME type of the request payload based on the 'Content-Type' header. Defaults to
    * "text/plain" if the header is missing.
    *
@@ -205,40 +192,96 @@ public class Request {
   }
 
   /**
+   * Retrieves the total number of body bytes successfully read from the client stream so far.
+   *
+   * @return the current count of bytes read
+   */
+  public long bytesRead() {
+    return activeStream != null ? activeStream.getBytesRead() : 0;
+  }
+
+  /**
+   * Retrieves the body stream of the request.
+   * {@code LevtusInputStream bodyStream = ctx.bodyStream();}
+   * {@code InputStream bodyStream = ctx.bodyStream();}
+   *
+   * @return the body stream from the socket {@link LevtusInputStream}
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
+   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
+   *                                      maxBodySize}
+   */
+  public LevtusInputStream bodyStream() {
+    if (this.cachedBody != null) {
+      throw new BodyAlreadyConsumedException(
+          "The request body has already been consumed and cached via body(). "
+              + "You cannot access the raw stream now.");
+    }
+    // Constraint: If they already grabbed the stream once before, block them
+    if (this.streamConsumed) {
+      throw new BodyAlreadyConsumedException(
+          "The request body stream has already been exclusively consumed.");
+    }
+    if (this.activeStream == null) {
+      this.activeStream = new LevtusInputStream(this.bodyStream, this.maxBodySize, this.contentLength());
+    }
+
+
+    this.streamConsumed = true;
+    return this.activeStream;
+  }
+
+  public void bodyStream(StreamConsumer consumer) {
+    try (LevtusInputStream lis = this.bodyStream()) {
+      consumer.consume(lis);
+    } catch (UncheckedIOException e) {
+      // If it's already wrapped by your stream, unwrap or pass it through
+      throw e;
+    } catch (IOException e) {
+      // If the developer's lambda logic threw a raw checked IOException
+      throw new LevtusIOException("Error processing body stream", e);
+    }
+  }
+
+  /**
    * Lazily reads the incoming payload from the raw stream into a byte array and caches it. Enforces
    * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * {@code byte[] body = ctx.body();}
    *
    * @return the raw byte array of the request body
-   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
-   *     maxBodySize}
-   * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
+   *                                      maxBodySize}
+   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
    */
   public byte[] body() {
-    if (cachedBody != null) {
+    if (isCached()) {
       return cachedBody;
     }
     try {
-      if (contentLength() > maxBodySize) {
-        throw new PayloadTooLargeException("Request body is too large");
+      if (this.streamConsumed) {
+        throw new BodyAlreadyConsumedException(
+            "Cannot access body(). The stream has already been exclusively claimed via bodyStream()."
+        );
       }
-      ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-      byte[] data = new byte[8192]; // 8KB chunks
-      int nRead;
-      int totalRead = 0;
-      while (totalRead < contentLength()
-          && (nRead = bodyStream.read(data, 0, Math.min(data.length, contentLength() - totalRead)))
-              != -1) {
-        buffer.write(data, 0, nRead);
-        totalRead += nRead;
-        setBytesRead(totalRead);
-        if (totalRead > maxBodySize) {
-          throw new PayloadTooLargeException("HTTP Body too long (Limit: " + maxBodySize + ")");
-        }
-      }
-      cachedBody = buffer.toByteArray();
+
+      InputStream stream = bodyStream();
+      cachedBody = stream.readAllBytes();
       return cachedBody;
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to read request body", e);
     }
+  }
+
+  /**
+   * Retrieves the body of the request in form of String. Enforces
+   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * <p>
+   * {@code String body = ctx.bodyAsString();}
+   *
+   * @return the body of the request as a String
+   */
+  public String bodyAsString() {
+    return new String(body(), StandardCharsets.UTF_8);
   }
 }

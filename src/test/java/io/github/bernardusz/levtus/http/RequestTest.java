@@ -3,8 +3,12 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+
+import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
 import org.junit.jupiter.api.Test;
 
 class RequestTest {
@@ -121,5 +125,71 @@ class RequestTest {
     assertArrayEquals(data, request.body());
     assertTrue(request.isCached());
     assertArrayEquals(data, request.body(), "Should return cached data on subsequent calls");
+  }
+
+  @Test
+  void testBodyReadingWithBodyStream() throws IOException {
+    byte[] data = "Hello Levtus".getBytes();
+    Request request =
+        new Request(
+            "POST",
+            "/msg",
+            Map.of("content-length", List.of(String.valueOf(data.length))),
+            Map.of(),
+            new ByteArrayInputStream(data),
+            1024);
+
+    assertFalse(request.isCached(), "Should not be cached immediately");
+    try (InputStream stream = request.bodyStream()) {
+      assertNotNull(stream, "Stream should not be null");
+      byte[] readData = stream.readAllBytes();
+      assertArrayEquals(data, readData, "Stream should contain the original data");
+    }
+    assertFalse(request.isCached());
+  }
+
+  @Test
+  void testThrowBodyAlreadyConsumed() throws IOException{
+    byte[] data = "Hello Levtus".getBytes();
+    Request request =
+        new Request(
+            "POST",
+            "/msg",
+            Map.of("content-length", List.of(String.valueOf(data.length))),
+            Map.of(),
+            new ByteArrayInputStream(data),
+            1024);
+
+    assertFalse(request.isCached(), "Should not be cached immediately");
+    try (InputStream stream = request.bodyStream()) {
+      assertNotNull(stream, "Stream should not be null");
+      byte[] readData = stream.readAllBytes();
+      assertArrayEquals(data, readData, "Stream should contain the original data");
+    }
+    assertFalse(request.isCached());
+
+    assertThrows(BodyAlreadyConsumedException.class, () -> request.bodyStream());
+    assertThrows(BodyAlreadyConsumedException.class, () -> request.body());
+    assertThrows(BodyAlreadyConsumedException.class, () -> request.bodyAsString());
+  }
+
+  @Test
+  void testBodyAlreadyConsumedCached(){
+    byte[] data = "Hello Levtus".getBytes();
+    Request request =
+        new Request(
+            "POST",
+            "/msg",
+            Map.of("content-length", List.of(String.valueOf(data.length))),
+            Map.of(),
+            new ByteArrayInputStream(data),
+            1024);
+
+    assertFalse(request.isCached());
+    assertArrayEquals(data, request.body());
+    assertTrue(request.isCached());
+    assertArrayEquals(data, request.body(), "Should return cached data on subsequent calls");
+
+    assertThrows(BodyAlreadyConsumedException.class, () -> request.bodyStream());
   }
 }

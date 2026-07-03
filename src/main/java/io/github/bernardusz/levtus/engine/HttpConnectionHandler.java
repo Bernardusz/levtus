@@ -1,6 +1,6 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.LevtusHttpException;
+import io.github.bernardusz.levtus.exception.http.LevtusHttpException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
@@ -26,10 +26,15 @@ class HttpConnectionHandler implements ConnectionHandler {
     this.parser = parser;
   }
 
+  /**
+   * The main method that handles a client connection.
+   *
+   * @param client the client socket to process
+   */
   public void handle(Socket client) {
     try (client;
-        BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
+         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
+         BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
       client.setSoTimeout(5000);
       Response res = new Response(outputStream, staticFilesPath);
 
