@@ -3,10 +3,10 @@ package io.github.bernardusz.levtus.engine;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
-import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
+import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

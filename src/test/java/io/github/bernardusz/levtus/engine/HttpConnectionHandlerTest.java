@@ -3,7 +3,7 @@ package io.github.bernardusz.levtus.engine;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;

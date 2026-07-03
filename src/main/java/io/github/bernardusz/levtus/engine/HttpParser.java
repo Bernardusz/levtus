@@ -1,9 +1,9 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
-import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
+import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,7 +29,7 @@ class HttpParser {
    *   <li>Body
    * </ul>
    *
-   * Immediately throws an Exception if:
+   * <p>Immediately throws an Exception if:
    *
    * <ul>
    *   <li>Request line is invalid
@@ -49,8 +49,8 @@ class HttpParser {
    *     {@link LevtusEngine#setMaxBodySize(int)} or {@link
    *     HttpConnectionHandler#setMaxBodySize(int)}
    * @throws HeaderTooLargeException If the header's total size exceeds {@link
-   *     LevtusEngine#getMaxHeaderSize()} or {@link HttpConnectionHandler#getMaxHeaderSize()} ()},
-   *     set via {@link LevtusEngine#setMaxHeaderSize(int)} or {@link
+   *     LevtusEngine#getMaxHeaderSize()} or {@link HttpConnectionHandler#getMaxHeaderSize()}, set
+   *     via {@link LevtusEngine#setMaxHeaderSize(int)} or {@link
    *     HttpConnectionHandler#setMaxHeaderSize(int)}
    * @throws LevtusNotImplementedException If the method is not implemented.
    */
@@ -416,7 +416,7 @@ class HttpParser {
   }
 
   /**
-   * The helper method to decode a string from UTF-8
+   * The helper method to decode a string from UTF-8.
    *
    * @param body the String that needs to be decoded
    * @return a decoded String

@@ -1,5 +1,12 @@
 package io.github.bernardusz.levtus.http;
 
+import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
+import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
+import io.github.bernardusz.levtus.io.LevtusInputStream;
+import io.github.bernardusz.levtus.io.StreamConsumer;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 
@@ -21,10 +28,14 @@ import java.util.Map;
  * @version 0.1.1
  */
 public class LevtusContext {
-  /** The Request object that represents an incoming HTTP/1.1 request. */
+  /**
+   * The Request object that represents an incoming HTTP/1.1 request.
+   */
   final Request req;
 
-  /** The fully instantiated Response object that represents an outgoing HTTP/1.1 response. */
+  /**
+   * The fully instantiated Response object that represents an outgoing HTTP/1.1 response.
+   */
   final Response res;
 
   /**
@@ -36,8 +47,8 @@ public class LevtusContext {
   /**
    * Instantiates a new LevtusContext, setting the Request, Response, and Path Parameters.
    *
-   * @param req the incoming request
-   * @param res the outgoing response
+   * @param req        the incoming request
+   * @param res        the outgoing response
    * @param pathParams the extracted path parameters
    */
   public LevtusContext(Request req, Response res, Map<String, String> pathParams) {
@@ -62,6 +73,63 @@ public class LevtusContext {
    */
   public Response res() {
     return res;
+  }
+
+  /**
+   * Retrieves the body stream of the request. Enforces
+   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * <p>
+   * {@code LevtusInputStream bodyStream = ctx.bodyStream();}
+   * {@code InputStream bodyStream = ctx.bodyStream();}
+   *
+   * @return the body stream from the socket {@link LevtusInputStream}
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
+   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
+   *                                      maxBodySize}
+   */
+  public LevtusInputStream bodyStream() {
+    return req.bodyStream();
+  }
+
+  public void bodyStream(StreamConsumer consumer) {
+    try (LevtusInputStream lis = this.bodyStream()) {
+      consumer.consume(lis);
+    } catch (UncheckedIOException e) {
+      // If it's already wrapped by your stream, unwrap or pass it through
+      throw e;
+    } catch (IOException e) {
+      // If the developer's lambda logic threw a raw checked IOException
+      throw new LevtusIOException("Error processing body stream", e);
+    }
+  }
+
+  /**
+   * Lazily reads the incoming payload from the raw stream into a byte array and caches it. Enforces
+   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * <p>
+   * {@code byte[] body = ctx.body();}
+   *
+   * @return the raw byte array of the request body
+   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
+   *                                      maxBodySize}
+   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
+   */
+  public byte[] body() {
+    return req.body();
+  }
+
+  /**
+   * Retrieves the body of the request in form of String. Enforces
+   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * <p>
+   * {@code String body = ctx.bodyAsString();}
+   *
+   * @return the body of the request as a String
+   */
+  public String bodyAsString() {
+    return req.bodyAsString();
   }
 
   /**
@@ -186,7 +254,7 @@ public class LevtusContext {
   /**
    * Sets a header, replacing any existing value(s) for this header name.
    *
-   * @param name the header name (must not be null)
+   * @param name  the header name (must not be null)
    * @param value the header value (must not be null)
    * @return The current LevtusContext instance for method chaining
    */
@@ -198,7 +266,7 @@ public class LevtusContext {
   /**
    * Sets a multi-value header, replacing any existing list for this header name.
    *
-   * @param name the header name (must not be null)
+   * @param name   the header name (must not be null)
    * @param values the header values (must not be null)
    * @return The current LevtusContext instance for method chaining
    */
@@ -242,9 +310,9 @@ public class LevtusContext {
   /**
    * Send a plain String as data through the Response with a custom status code and content type.
    *
-   * @param code the HTTP status code
+   * @param code        the HTTP status code
    * @param contentType the MIME type of the content (e.g., "application/json")
-   * @param data the string data to send
+   * @param data        the string data to send
    */
   public void send(int code, String contentType, String data) {
     res.status(code).contentType(contentType);
