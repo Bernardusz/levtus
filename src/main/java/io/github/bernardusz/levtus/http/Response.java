@@ -37,8 +37,6 @@ public class Response {
   public Response(BufferedOutputStream output, String staticFilesPath) {
     this.output = output;
     this.staticFilesPath = staticFilesPath;
-    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
-    headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.1")));
   }
 
   /**
@@ -208,7 +206,26 @@ public class Response {
   }
 
   /**
+   * Sends an empty response with the current status code without a body.
+   *
+   * @implNote This method is primarily used for sending 100-Continue response and empty responses.
+   */
+  public void send() {
+    if (isSent) return;
+    isSent = true;
+    try {
+      writeStatus(statusCode);
+      writeHeaders();
+      output.flush();
+    } catch (IOException e) {
+      System.err.println("Failed to send response: " + e.getMessage());
+    }
+  }
+
+  /**
    * Transmits the final HTTP status line, headers, and body bytes to the client socket.
+   *
+   * <p>Automatically sets the "Content-Type" and "Server" headers if not already set.
    *
    * @implNote Flushes the stream immediately after writing. Subsequent calls to any send method
    *     will be ignored.
@@ -217,6 +234,10 @@ public class Response {
   public void send(byte[] bodyBytes) {
     if (isSent) return;
     isSent = true;
+
+    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
+    headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.1")));
+
     try {
       // HTTP Status
       writeStatus(statusCode);
@@ -228,6 +249,15 @@ public class Response {
     }
   }
 
+  private void writeHeaders() throws IOException {
+    for (var entry : headers.entrySet()) {
+      for (var headerValue : entry.getValue()) {
+        output.write(
+            (purifyHeader(entry.getKey()) + ": " + purifyHeader(headerValue) + "\r\n").getBytes());
+      }
+    }
+    output.write("\r\n".getBytes());
+  }
   private void writeHeaders(long contentLength) throws IOException {
     headers.put("Content-Length", new ArrayList<>(List.of(String.valueOf(contentLength))));
     for (var entry : headers.entrySet()) {
@@ -255,6 +285,7 @@ public class Response {
 
   private String getStatusText(int code) {
     return switch (code) {
+      case 100 -> "Continue";
       case 200 -> "OK";
       case 201 -> "Created";
       case 204 -> "No Content";

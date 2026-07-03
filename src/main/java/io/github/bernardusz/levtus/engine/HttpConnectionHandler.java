@@ -33,14 +33,14 @@ class HttpConnectionHandler implements ConnectionHandler {
    */
   public void handle(Socket client) {
     try (client;
-         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-         BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
+        BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
+        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
       client.setSoTimeout(5000);
       Response res = new Response(outputStream, staticFilesPath);
 
       try {
         Request req;
-        while ((req = parser.parseRequest(this, inputStream)) != null) {
+        while ((req = parser.parseRequest(this, inputStream, res)) != null) {
           res = new Response(outputStream, staticFilesPath);
           client.setSoTimeout(20000);
           router.handle(req, res);

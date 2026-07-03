@@ -5,8 +5,8 @@ import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
 import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Node;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,6 +43,7 @@ class HttpParser {
    *
    * @param handler The handler that uses HttpParser for parsing
    * @param inputStream The stream to read the HTTP request from
+   * @param response The response object to be used for sending responses for accepting 100-Continue request
    * @return {@link Request} A fully parsed Request object, or null if the stream is empty
    * @throws IOException If a network or stream error occurs
    * @throws BadRequestException If the request line is invalid or headers are malformed
@@ -56,7 +57,7 @@ class HttpParser {
    *     HttpConnectionHandler#setMaxHeaderSize(int)}
    * @throws LevtusNotImplementedException If the method is not implemented.
    */
-  Request parseRequest(HttpConnectionHandler handler, InputStream inputStream)
+  Request parseRequest(HttpConnectionHandler handler, InputStream inputStream, Response response)
       throws IOException,
           BadRequestException,
           PayloadTooLargeException,
@@ -98,10 +99,10 @@ class HttpParser {
     // Parse the Body
     long limit = handler.getMaxBodySize();
     Node matchedNode = handler.router.matchRoute(method, normalizedPath);
-    if (matchedNode != null && matchedNode.getMaxBodySize() != -1){
+    if (matchedNode != null && matchedNode.getMaxBodySize() != -1) {
       limit = matchedNode.getMaxBodySize();
     }
-    validateBodySize(headers, limit);
+    validateBodySize(headers, limit, response);
 
     return new Request(
         method, normalizedPath, headers, queryParams, inputStream, handler.getMaxBodySize());
@@ -222,11 +223,12 @@ class HttpParser {
    *
    * @param headers the headers of an HTTP request
    * @param maxBodySize the maximum body size in an HTTP request
+   * @param response the {@link Response} object used for accepting 100-Continue request
    * @throws PayloadTooLargeException if the body size exceeds the maximum allowed size {@link
    *     LevtusEngine#getMaxBodySize()} or {@link HttpConnectionHandler#getMaxBodySize()}.
    * @throws BadRequestException if more than one Content-Length header is present
    */
-  void validateBodySize(Map<String, List<String>> headers, long maxBodySize)
+  void validateBodySize(Map<String, List<String>> headers, long maxBodySize, Response response)
       throws PayloadTooLargeException, BadRequestException {
     int contentLength;
     List<String> lengthStrList =
@@ -241,6 +243,12 @@ class HttpParser {
         if (contentLength > maxBodySize) {
           throw new PayloadTooLargeException(
               "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
+        }
+        List<String> expectHeaders = headers.get("expect");
+        if (expectHeaders != null
+            && !expectHeaders.isEmpty()
+            && expectHeaders.getFirst().equalsIgnoreCase("100-continue")) {
+          response.status(100).send();
         }
       } catch (NumberFormatException e) {
         throw new BadRequestException("400 - Bad Request (Content Length is invalid)");

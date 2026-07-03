@@ -16,8 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ResponseTest {
 
-  @TempDir
-  Path tempDir;
+  @TempDir Path tempDir;
   private BufferedOutputStream mockOutput;
   private Response response;
 
@@ -67,11 +66,11 @@ class ResponseTest {
   }
 
   private byte[] containsBytes(String str) {
-      return argThat(bytes -> new String(bytes).contains(str));
+    return argThat(bytes -> new String(bytes).contains(str));
   }
 
   @Test
-  void testStatusChange(){
+  void testStatusChange() {
     response.status(404);
     assertEquals(404, response.statusCode);
   }
@@ -89,7 +88,7 @@ class ResponseTest {
   }
 
   @Test
-  void testSingularHeader(){
+  void testSingularHeader() {
     response.header("X-Custom", "Value");
     response.header("Server", "Levtus-0.1.0");
     response.header("Server", "Levtus-0.1.1");
@@ -113,7 +112,7 @@ class ResponseTest {
   }
 
   @Test
-  void testFullHeaders(){
+  void testFullHeaders() {
     Map<String, List<String>> headers = new HashMap<>();
     List<String> firstHeaders = List.of("Value1", "Value2");
     List<String> secondHeaders = List.of("Value1", "Value2");
@@ -162,6 +161,13 @@ class ResponseTest {
   @Test
   void testBinaryHelperSetsContentType() throws IOException {
     response.sendBinary(new byte[] {0, 1});
+    assertTrue(response.isSent());
+    verify(mockOutput).flush();
+  }
+
+  @Test
+  void testSendHelperEmpty() throws IOException {
+    response.send();
     assertTrue(response.isSent());
     verify(mockOutput).flush();
   }
