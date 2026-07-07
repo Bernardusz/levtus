@@ -1,8 +1,12 @@
 package io.github.bernardusz.levtus.http;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import io.github.bernardusz.levtus.exception.developer.FileNotFound;
+import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
+import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
+import java.io.*;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,7 +22,7 @@ import java.util.Map;
  * status codes, and various payload formats (text, JSON, HTML, binary files).
  */
 public class Response {
-  private final BufferedOutputStream output;
+  private final OutputStream output;
 
   /** The base directory path from which static files are served. */
   String staticFilesPath;
@@ -34,7 +38,7 @@ public class Response {
    * @param output the buffered output stream connected to the client (must not be null)
    * @param staticFilesPath the directory path for resolving static files (must not be null)
    */
-  public Response(BufferedOutputStream output, String staticFilesPath) {
+  public Response(OutputStream output, String staticFilesPath) {
     this.output = output;
     this.staticFilesPath = staticFilesPath;
   }
@@ -115,8 +119,9 @@ public class Response {
    * Encodes a string into UTF-8 bytes and sends it as the response payload.
    *
    * @param body the raw string payload to send (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void send(String body) {
+  public void send(String body) throws LevtusIOException {
     send(body.getBytes(StandardCharsets.UTF_8));
   }
 
@@ -125,8 +130,9 @@ public class Response {
    * "text/html".
    *
    * @param body the HTML formatted string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void html(String body) {
+  public void html(String body) throws LevtusIOException {
     contentType("text/html");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -136,8 +142,9 @@ public class Response {
    * "text/plain".
    *
    * @param body the plain text string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void text(String body) {
+  public void text(String body) throws LevtusIOException {
     contentType("text/plain");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -147,8 +154,9 @@ public class Response {
    * "application/octet-stream".
    *
    * @param body the byte array representing the file or binary data (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void sendBinary(byte[] body) {
+  public void sendBinary(byte[] body) throws LevtusIOException {
     contentType("application/octet-stream");
     send(body);
   }
@@ -158,8 +166,9 @@ public class Response {
    * to "application/json".
    *
    * @param body the serialized JSON string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void json(String body) {
+  public void json(String body) throws LevtusIOException {
     contentType("application/json");
     send(body.getBytes(StandardCharsets.UTF_8));
   }
@@ -172,15 +181,17 @@ public class Response {
    *
    * @param htmlPath the relative path of the file within the configured static directory (must not
    *     be null)
-   * @throws UncheckedIOException if an error occurs while accessing or streaming the file
+   * @throws LevtusIOException if an error occurs while accessing or streaming the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the file path contains traversal characters
    */
-  public void render(String htmlPath) {
+  public void render(String htmlPath) throws LevtusIOException, FileNotFound, PathTraversalException {
+    if (isSent) return;
     Path filePath = Path.of(staticFilesPath, htmlPath).normalize();
 
     Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
     if (!filePath.toAbsolutePath().startsWith(rootPath)) {
-      this.status(403).send("403 Forbidden");
-      return;
+      throw new PathTraversalException("Path traversal detected");
     }
 
     if (Files.exists(filePath) && !Files.isDirectory(filePath)) {
@@ -190,18 +201,12 @@ public class Response {
         this.contentType(mimeType);
         this.status(200);
 
-        if (isSent) return;
-        isSent = true;
-
-        writeStatus(statusCode);
-        writeHeaders(Files.size(filePath));
-        Files.copy(filePath, output);
-        output.flush();
+        sendFile(filePath);
       } catch (IOException e) {
-        throw new UncheckedIOException(e);
+        throw new LevtusIOException(e.getMessage(), e);
       }
     } else {
-      this.status(404).send("404 Not Found");
+      throw new FileNotFound("File not found (relative path): " + htmlPath);
     }
   }
 
@@ -209,16 +214,17 @@ public class Response {
    * Sends an empty response with the current status code without a body.
    *
    * @implNote This method is primarily used for sending 100-Continue response and empty responses.
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
   public void send() {
     if (isSent) return;
-    isSent = true;
     try {
       writeStatus(statusCode);
       writeHeaders();
       output.flush();
+      isSent = true;
     } catch (IOException e) {
-      System.err.println("Failed to send response: " + e.getMessage());
+      throw new LevtusIOException(e.getMessage(), e);
     }
   }
 
@@ -230,10 +236,10 @@ public class Response {
    * @implNote Flushes the stream immediately after writing. Subsequent calls to any send method
    *     will be ignored.
    * @param bodyBytes the complete raw payload (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void send(byte[] bodyBytes) {
+  public void send(byte[] bodyBytes) throws LevtusIOException {
     if (isSent) return;
-    isSent = true;
 
     headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
     headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.1")));
@@ -244,9 +250,105 @@ public class Response {
       writeHeaders(bodyBytes.length);
       writeBody(bodyBytes);
       output.flush();
+      isSent = true;
     } catch (IOException e) {
-      System.err.println("Failed to send response: " + e.getMessage());
+      throw new LevtusIOException(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * @param path the file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public void sendFile(Path path) throws LevtusIOException, FileNotFound {
+    if (isSent) return;
+
+    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
+    headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.2")));
+
+    try {
+      writeStatus(statusCode);
+      writeHeaders();
+      writeBody(path);
+      output.flush();
+      isSent = true;
+    } catch (IOException e) {
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   *
+   * @param path the relative file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public void sendFile(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
+    Path filePath = Path.of(staticFilesPath, path).normalize();
+    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
+    
+    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
+      throw new PathTraversalException("Path traversal detected");
+    }
+    
+    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+      throw new FileNotFound("File not found (relative path): " + path);
+    }
+    
+    sendFile(filePath);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer for downloads.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>A wrapper method that sets the content type to "application/octet-stream"</p>
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   *
+   * @param path the file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public void sendBinary(Path path) throws LevtusIOException, FileNotFound {
+    contentType("application/octet-stream").sendFile(path);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer for downloads.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>A wrapper method that sets the content type to "application/octet-stream"</p>
+   * <p>Resolves the path relative to the configured static files directory and performs
+   * security checks to prevent directory traversal attacks.</p>
+   * <p>Internally calls {@link #sendBinary(Path)}</p>
+   *
+   * @param path the relative file path within the static directory
+   * @throws LevtusIOException if an I/O error occurs while transferring the file or if the path is invalid
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public void sendBinary(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
+    Path filePath = Path.of(staticFilesPath, path).normalize();
+    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
+    
+    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
+      throw new PathTraversalException("Path traversal detected");
+    }
+    
+    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+      throw new FileNotFound("File not found (relative path): " + path);
+    }
+    
+    sendBinary(filePath);
   }
 
   private void writeHeaders() throws IOException {
@@ -271,6 +373,31 @@ public class Response {
 
   private void writeBody(byte[] bodyBytes) throws IOException {
     output.write(bodyBytes);
+  }
+
+  private void writeBody(Path path) throws LevtusIOException, FileNotFound {
+    if (!Files.exists(path) || Files.isDirectory(path)) {
+      throw new FileNotFound("File not found (absolute path): " + path);
+    }
+    
+    try(FileChannel fileChannel = FileChannel.open(path)) {
+
+      WritableByteChannel targetChannel = Channels.newChannel(output);
+
+      long position = 0;
+      long size = fileChannel.size();
+
+      while (position < size) {
+        long transferred = fileChannel.transferTo(position, size - position, targetChannel);
+        if (transferred <= 0){
+          break;
+        }
+        position += transferred;
+      }
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
   }
 
   private void writeStatus(int statusCode) throws IOException {

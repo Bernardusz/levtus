@@ -1,12 +1,15 @@
 package io.github.bernardusz.levtus.http;
 
 import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
+import io.github.bernardusz.levtus.exception.developer.FileNotFound;
 import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
+import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.io.LevtusInputStream;
 import io.github.bernardusz.levtus.io.StreamConsumer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -28,14 +31,10 @@ import java.util.Map;
  * @version 0.1.1
  */
 public class LevtusContext {
-  /**
-   * The Request object that represents an incoming HTTP/1.1 request.
-   */
+  /** The Request object that represents an incoming HTTP/1.1 request. */
   final Request req;
 
-  /**
-   * The fully instantiated Response object that represents an outgoing HTTP/1.1 response.
-   */
+  /** The fully instantiated Response object that represents an outgoing HTTP/1.1 response. */
   final Response res;
 
   /**
@@ -47,8 +46,8 @@ public class LevtusContext {
   /**
    * Instantiates a new LevtusContext, setting the Request, Response, and Path Parameters.
    *
-   * @param req        the incoming request
-   * @param res        the outgoing response
+   * @param req the incoming request
+   * @param res the outgoing response
    * @param pathParams the extracted path parameters
    */
   public LevtusContext(Request req, Response res, Map<String, String> pathParams) {
@@ -76,17 +75,17 @@ public class LevtusContext {
   }
 
   /**
-   * Retrieves the body stream of the request. Enforces
-   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
-   * <p>
-   * {@code LevtusInputStream bodyStream = ctx.bodyStream();}
-   * {@code InputStream bodyStream = ctx.bodyStream();}
+   * Retrieves the body stream of the request. Enforces the configured maximum body size limits to
+   * prevent memory exhaustion (OOM) attacks.
+   *
+   * <p>{@code LevtusInputStream bodyStream = ctx.bodyStream();} {@code InputStream bodyStream =
+   * ctx.bodyStream();}
    *
    * @return the body stream from the socket {@link LevtusInputStream}
    * @throws BodyAlreadyConsumedException if the body has already been consumed
-   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
-   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
-   *                                      maxBodySize}
+   * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
+   *     maxBodySize}
    */
   public LevtusInputStream bodyStream() {
     return req.bodyStream();
@@ -107,13 +106,13 @@ public class LevtusContext {
   /**
    * Lazily reads the incoming payload from the raw stream into a byte array and caches it. Enforces
    * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
-   * <p>
-   * {@code byte[] body = ctx.body();}
+   *
+   * <p>{@code byte[] body = ctx.body();}
    *
    * @return the raw byte array of the request body
-   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
-   *                                      maxBodySize}
-   * @throws UncheckedIOException         if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
+   *     maxBodySize}
+   * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
    * @throws BodyAlreadyConsumedException if the body has already been consumed
    */
   public byte[] body() {
@@ -121,10 +120,10 @@ public class LevtusContext {
   }
 
   /**
-   * Retrieves the body of the request in form of String. Enforces
-   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
-   * <p>
-   * {@code String body = ctx.bodyAsString();}
+   * Retrieves the body of the request in form of String. Enforces the configured maximum body size
+   * limits to prevent memory exhaustion (OOM) attacks.
+   *
+   * <p>{@code String body = ctx.bodyAsString();}
    *
    * @return the body of the request as a String
    */
@@ -254,7 +253,7 @@ public class LevtusContext {
   /**
    * Sets a header, replacing any existing value(s) for this header name.
    *
-   * @param name  the header name (must not be null)
+   * @param name the header name (must not be null)
    * @param value the header value (must not be null)
    * @return The current LevtusContext instance for method chaining
    */
@@ -266,7 +265,7 @@ public class LevtusContext {
   /**
    * Sets a multi-value header, replacing any existing list for this header name.
    *
-   * @param name   the header name (must not be null)
+   * @param name the header name (must not be null)
    * @param values the header values (must not be null)
    * @return The current LevtusContext instance for method chaining
    */
@@ -292,8 +291,9 @@ public class LevtusContext {
    * Send a plain String as data (text/plain) through the Response.
    *
    * @param data the string data to send
+   * @throws LevtusIOException if an I/O error occurs while sending the data
    */
-  public void send(String data) {
+  public void send(String data) throws LevtusIOException {
     res.send(data);
   }
 
@@ -302,65 +302,146 @@ public class LevtusContext {
    *
    * @param code the HTTP status code
    * @param data the string data to send
+   * @throws LevtusIOException if an I/O error occurs while sending the data
    */
-  public void send(int code, String data) {
+  public void send(int code, String data) throws LevtusIOException {
     res.status(code).send(data);
   }
 
   /**
    * Send a plain String as data through the Response with a custom status code and content type.
    *
-   * @param code        the HTTP status code
+   * @param code the HTTP status code
    * @param contentType the MIME type of the content (e.g., "application/json")
-   * @param data        the string data to send
+   * @param data the string data to send
+   * @throws LevtusIOException if an I/O error occurs while sending the data
    */
-  public void send(int code, String contentType, String data) {
+  public void send(int code, String contentType, String data) throws LevtusIOException {
     res.status(code).contentType(contentType);
     res.send(data);
   }
 
   /**
-   * Send an HTML String as data (text/html) through the Response.
+   * Sends an HTML string as the response payload, automatically setting the "Content-Type" to
+   * "text/html".
    *
-   * @param html the html
+   * @param html the HTML formatted string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void html(String html) {
+  public void html(String html) throws LevtusIOException {
     res.html(html);
   }
 
   /**
-   * Send a plain String as data (text/plain) through the Response.
+   * Sends a plain text string as the response payload, automatically setting the "Content-Type" to
+   * "text/plain".
    *
-   * @param text the text
+   * @param text the plain text string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void text(String text) {
+  public void text(String text) throws LevtusIOException {
     res.text(text);
   }
 
   /**
-   * Send a binary array as data (application/octet-stream) through the Response.
+   * Sends a raw byte array as a downloadable payload, automatically setting the "Content-Type" to
+   * "application/octet-stream".
    *
-   * @param body the body
+   * @param body the byte array representing the file or binary data (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void sendBinary(byte[] body) {
+  public void sendBinary(byte[] body) throws LevtusIOException {
     res.sendBinary(body);
   }
 
   /**
-   * Send a JSON String as data (application/json) through the Response.
+   * Sends a JSON formatted string as the response payload, automatically setting the "Content-Type"
+   * to "application/json".
    *
-   * @param json the String JSON
+   * @param json the serialized JSON string (must not be null)
+   * @throws LevtusIOException if an I/O error occurs while writing to the socket stream
    */
-  public void json(String json) {
+  public void json(String json) throws LevtusIOException {
     res.json(json);
   }
 
   /**
-   * Send an HTML file as data (text/html) through the Response.
+   * Streams a file from the server's disk to the client. Safely resolves paths to prevent directory
+   * traversal attacks (403 Forbidden). Automatically probes and sets the correct MIME type.
    *
-   * @param htmlPath the path of HTML file
+   * <p>{@code ctx.render("index.html");}
+   *
+   * @param htmlPath the relative path of the file within the configured static directory (must not
+   *     be null)
+   * @throws LevtusIOException if an error occurs while accessing or streaming the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
    */
-  public void render(String htmlPath) {
+  public void render(String htmlPath)
+      throws LevtusIOException, FileNotFound, PathTraversalException {
     res.render(htmlPath);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * @param path the absolute file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public void sendFile(Path path) throws LevtusIOException, FileNotFound {
+    res.sendFile(path);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Resolves the path relative to the configured static files directory and performs security
+   * checks to prevent directory traversal attacks.
+   *
+   * @param path the relative file path within the static directory
+   * @throws LevtusIOException if an I/O error occurs while transferring the file or if the path is
+   *     invalid
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public void sendFile(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
+    res.sendFile(path);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer for downloads. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>A wrapper method that sets the content type to "application/octet-stream"
+   *
+   * @param path the absolute file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public void sendBinary(Path path) throws LevtusIOException, FileNotFound {
+    res.sendBinary(path);
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer for downloads. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>A wrapper method that sets the content type to "application/octet-stream"
+   *
+   * <p>Resolves the path relative to the configured static files directory and performs security
+   * checks to prevent directory traversal attacks.
+   *
+   * @param path the relative file path within the static directory
+   * @throws LevtusIOException if an I/O error occurs while transferring the file or if the path is
+   *     invalid
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public void sendBinary(String path)
+      throws LevtusIOException, FileNotFound, PathTraversalException {
+    res.sendBinary(path);
   }
 }

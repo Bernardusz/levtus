@@ -6,8 +6,8 @@ import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.spi.ConnectionHandler;
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
@@ -34,7 +34,7 @@ class HttpConnectionHandler implements ConnectionHandler {
   public void handle(Socket client) {
     try (client;
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
+        OutputStream outputStream = client.getOutputStream()) {
       client.setSoTimeout(5000);
       Response res = new Response(outputStream, staticFilesPath);
 

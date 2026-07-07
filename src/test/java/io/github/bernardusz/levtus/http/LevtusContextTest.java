@@ -3,22 +3,28 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.github.bernardusz.levtus.exception.developer.FileNotFound;
+import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class LevtusContextTest {
 
+  @TempDir Path tempDir;
   Map<String, String> pathParams;
   @Mock private Request mockRequest;
   private Response realResponse;
@@ -30,7 +36,7 @@ class LevtusContextTest {
     mockRequest = mock(Request.class);
 
     responseBuffer = new ByteArrayOutputStream();
-    realResponse = new Response(new BufferedOutputStream(responseBuffer), "./public");
+    realResponse = new Response(new BufferedOutputStream(responseBuffer), tempDir.toString());
     pathParams = new HashMap<>();
 
     context = new LevtusContext(mockRequest, realResponse, new HashMap<>());
@@ -268,5 +274,136 @@ class LevtusContextTest {
 
     String rawText = responseBuffer.toString(StandardCharsets.UTF_8);
     assertTrue(rawText.contains("Content-Length: 3"));
+  }
+
+  @Test
+  void testSendFile_Path_ShouldDelegate() throws Exception {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    context.sendFile(testFile);
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("Hello World"));
+  }
+
+  @Test
+  void testSendFile_String_ShouldDelegate() throws Exception {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    context.sendFile("sample.txt");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("Hello World"));
+  }
+
+  @Test
+  void testSendFile_String_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> {
+      context.sendFile("nonexistent.txt");
+    });
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendFile_String_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.txt");
+    Files.writeString(secretFile, "sensitive data");
+
+    assertThrows(PathTraversalException.class, () -> {
+      context.sendFile("../secret.txt");
+    });
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendBinary_Path_ShouldDelegate() throws Exception {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    context.sendBinary(binaryFile);
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Content-Type: application/octet-stream"));
+    assertTrue(rawResponse.contains("010101"));
+  }
+
+  @Test
+  void testSendBinary_String_ShouldDelegate() throws Exception {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    context.sendBinary("image.bin");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Content-Type: application/octet-stream"));
+    assertTrue(rawResponse.contains("010101"));
+  }
+
+  @Test
+  void testSendBinary_String_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> {
+      context.sendBinary("nonexistent.bin");
+    });
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendBinary_String_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.bin");
+    Files.writeString(secretFile, "sensitive data");
+
+    assertThrows(PathTraversalException.class, () -> {
+      context.sendBinary("../secret.bin");
+    });
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testRender_ShouldDelegate() throws Exception {
+    Path htmlFile = tempDir.resolve("index.html");
+    Files.writeString(htmlFile, "<h1>Hello</h1>");
+
+    context.render("index.html");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("<h1>Hello</h1>"));
+  }
+
+  @Test
+  void testRender_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> {
+      context.render("missing.html");
+    });
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testRender_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.html");
+    Files.writeString(secretFile, "<h1>Secret</h1>");
+
+    assertThrows(PathTraversalException.class, () -> {
+      context.render("../secret.html");
+    });
+
+    assertFalse(context.res.isSent());
   }
 }
