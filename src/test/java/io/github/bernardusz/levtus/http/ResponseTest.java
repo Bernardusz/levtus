@@ -3,8 +3,12 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.github.bernardusz.levtus.exception.developer.FileNotFound;
+import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -23,7 +27,9 @@ class ResponseTest {
   @BeforeEach
   void setUp() {
     mockOutput = mock(BufferedOutputStream.class);
-    response = new Response(mockOutput, tempDir.toString());
+    Response realResponse = new Response(mockOutput, tempDir.toString());
+
+    response = spy(realResponse);
   }
 
   @Test
@@ -39,16 +45,127 @@ class ResponseTest {
     response.render("index.html");
 
     assertTrue(response.isSent());
-    verify(mockOutput, atLeastOnce()).write(any(byte[].class));
+    verify(response, atLeastOnce()).render("index.html");
+    verify(response, atLeastOnce()).sendFile(tempDir.resolve("index.html"));
+  }
+
+  @Test
+  void testSendFileSuccess() throws IOException {
+    // 1. Create a dummy file with known content
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    // 2. Use a real stream to capture raw output easily
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+    response.status(200); // Set explicit status
+
+    // 3. Act
+    response.sendFile(testFile);
+
+    // 4. Assert State
+    assertTrue(response.isSent());
+
+    // 5. Assert Output (Verify headers and body content were written)
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Content-Type: text/plain"));
+    assertTrue(resultOutput.contains("Server: Levtus-v0.2"));
+    assertTrue(resultOutput.contains("Hello World")); // Verifies writeBody worked
+  }
+
+  @Test
+  void testSendFile_ShouldReturnEarly_WhenAlreadySent() throws IOException {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello");
+
+    // Use a mock stream to strictly count interactions
+    BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
+    Response response = new Response(mockOutput, tempDir.toString());
+
+    // First call sets isSent = true and writes data
+    response.sendFile(testFile);
+
+    // Clear mock interactions from the first call to isolate the second call
+    org.mockito.Mockito.clearInvocations(mockOutput);
+
+    // Act - Second call
+    response.sendFile(testFile);
+
+    // Assert - No further bytes should be written or flushed to the stream
+    verifyNoInteractions(mockOutput);
+  }
+
+  @Test
+  void testSendFile_ShouldThrowFileNotFound_WhenFileDoesNotExist() {
+    BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
+    Response response = new Response(mockOutput, tempDir.toString());
+    Path nonExistentFile = tempDir.resolve("ghost.txt");
+
+    // Assert that your custom exception is thrown
+    assertThrows(FileNotFound.class, () -> {
+      response.sendFile(nonExistentFile);
+    });
+  }
+
+  @Test
+  void testSendBinary_ShouldSetOctetStreamHeader() throws IOException {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Act
+    response.sendBinary(binaryFile);
+
+    // Assert
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("Content-Type: application/octet-stream"));
+  }
+
+  @Test
+  void testSendFile_StringPath_ShouldWork() throws IOException {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Act - using String path overload
+    response.sendFile("sample.txt");
+
+    // Assert
+    assertTrue(response.isSent());
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Hello World"));
+  }
+
+  @Test
+  void testSendBinary_StringPath_ShouldSetOctetStreamHeader() throws IOException {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Act - using String path overload
+    response.sendBinary("image.bin");
+
+    // Assert
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("Content-Type: application/octet-stream"));
   }
 
   @Test
   void testRenderNotFound() throws IOException {
-    response.render("missing.html");
+    assertThrows(FileNotFound.class, () -> {
+      response.render("missing.html");
+    });
 
-    assertTrue(response.isSent());
-    // Should have sent 404
-    verify(mockOutput, atLeastOnce()).write(containsBytes("404 Not Found"));
+    assertFalse(response.isSent()); // Making sure the response isn't sent, so devs who catch it can handle it
+
   }
 
   @Test
@@ -59,10 +176,12 @@ class ResponseTest {
     Files.writeString(secretFile, "sensitive data");
 
     // Try to access it via traversal
-    response.render("../secret.txt");
+    // Should have thrown PathTraversalException
+    assertThrows(PathTraversalException.class, () -> {
+      response.render("../secret.txt");
+    });
 
-    // Should have sent 403 Forbidden
-    verify(mockOutput, atLeastOnce()).write(containsBytes("403 Forbidden"));
+    assertFalse(response.isSent()); // Making sure the response isn't sent, so devs who catch it can handle it
   }
 
   private byte[] containsBytes(String str) {
