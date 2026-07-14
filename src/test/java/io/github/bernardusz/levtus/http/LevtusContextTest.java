@@ -24,6 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class LevtusContextTest {
 
+  private final int defaultChunkSize = 64 * 1024;
+  private final long defaultChunkCount = 1000;
   @TempDir Path tempDir;
   Map<String, String> pathParams;
   @Mock private Request mockRequest;
@@ -71,9 +73,7 @@ class LevtusContextTest {
     assertEquals("1", ctx.param("id"));
 
     // Attempt to modify the map returned by params()
-    assertThrows(UnsupportedOperationException.class, () -> {
-      ctx.params().put("id", "3");
-    });
+    assertThrows(UnsupportedOperationException.class, () -> ctx.params().put("id", "3"));
   }
 
   @Test
@@ -102,8 +102,8 @@ class LevtusContextTest {
     context.header("Server", "Levtus-0.1.1"); // This should overwrite the previous one
 
     // 3. Assert
-    assertEquals("Value", context.res.headers.get("X-Custom").get(0));
-    assertEquals("Levtus-0.1.1", context.res.headers.get("Server").get(0));
+    assertEquals("Value", context.res.headers.get("X-Custom").getFirst());
+    assertEquals("Levtus-0.1.1", context.res.headers.get("Server").getFirst());
   }
 
   @Test
@@ -146,7 +146,7 @@ class LevtusContextTest {
         "id", List.of("123"));
 
     Request request = new Request(
-      "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+      "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -180,7 +180,7 @@ class LevtusContextTest {
 
     Request request =
       new Request(
-        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -201,7 +201,7 @@ class LevtusContextTest {
         "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+      new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -304,9 +304,7 @@ class LevtusContextTest {
 
   @Test
   void testSendFile_String_ShouldThrowFileNotFound() {
-    assertThrows(FileNotFound.class, () -> {
-      context.sendFile("nonexistent.txt");
-    });
+    assertThrows(FileNotFound.class, () -> context.sendFile("nonexistent.txt"));
 
     assertFalse(context.res.isSent());
   }
@@ -317,9 +315,7 @@ class LevtusContextTest {
     Path secretFile = outsideDir.resolve("secret.txt");
     Files.writeString(secretFile, "sensitive data");
 
-    assertThrows(PathTraversalException.class, () -> {
-      context.sendFile("../secret.txt");
-    });
+    assertThrows(PathTraversalException.class, () -> context.sendFile("../secret.txt"));
 
     assertFalse(context.res.isSent());
   }
@@ -352,9 +348,7 @@ class LevtusContextTest {
 
   @Test
   void testSendBinary_String_ShouldThrowFileNotFound() {
-    assertThrows(FileNotFound.class, () -> {
-      context.sendBinary("nonexistent.bin");
-    });
+    assertThrows(FileNotFound.class, () -> context.sendBinary("nonexistent.bin"));
 
     assertFalse(context.res.isSent());
   }
@@ -365,9 +359,7 @@ class LevtusContextTest {
     Path secretFile = outsideDir.resolve("secret.bin");
     Files.writeString(secretFile, "sensitive data");
 
-    assertThrows(PathTraversalException.class, () -> {
-      context.sendBinary("../secret.bin");
-    });
+    assertThrows(PathTraversalException.class, () -> context.sendBinary("../secret.bin"));
 
     assertFalse(context.res.isSent());
   }
@@ -387,9 +379,7 @@ class LevtusContextTest {
 
   @Test
   void testRender_ShouldThrowFileNotFound() {
-    assertThrows(FileNotFound.class, () -> {
-      context.render("missing.html");
-    });
+    assertThrows(FileNotFound.class, () -> context.render("missing.html"));
 
     assertFalse(context.res.isSent());
   }
@@ -400,10 +390,35 @@ class LevtusContextTest {
     Path secretFile = outsideDir.resolve("secret.html");
     Files.writeString(secretFile, "<h1>Secret</h1>");
 
-    assertThrows(PathTraversalException.class, () -> {
-      context.render("../secret.html");
-    });
+    assertThrows(PathTraversalException.class, () -> context.render("../secret.html"));
 
     assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSetChunkSizeAttribute(){
+    context.withChunkSize(1024);
+    assertEquals(1024, context.chunkSize());
+
+    context.withChunkSize(2048);
+    assertEquals(2048, context.chunkSize());
+  }
+
+  @Test
+  void testChainingChunkedMethodAndResult(){
+    context
+        .withChunkSize(1024)
+        .stream()
+        .sendChunk("Hello ")
+        .sendChunk("World! ", 0, 7)
+        .sendChunk("This is ".getBytes())
+        .sendChunk("Levtus!".getBytes(), 0, 7)
+        .finishChunkedResponse();
+    ;
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("6\r\nHello \r\n7\r\nWorld! \r\n8\r\nThis is \r\n7\r\nLevtus!\r\n0\r\n\r\n"));
   }
 }

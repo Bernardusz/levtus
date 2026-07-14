@@ -3,11 +3,10 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.github.bernardusz.levtus.exception.developer.ChunkedTransferException;
 import io.github.bernardusz.levtus.exception.developer.FileNotFound;
 import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,12 +20,12 @@ import org.junit.jupiter.api.io.TempDir;
 class ResponseTest {
 
   @TempDir Path tempDir;
-  private BufferedOutputStream mockOutput;
+  private OutputStream mockOutput;
   private Response response;
 
   @BeforeEach
   void setUp() {
-    mockOutput = mock(BufferedOutputStream.class);
+    mockOutput = mock(OutputStream.class);
     Response realResponse = new Response(mockOutput, tempDir.toString());
 
     response = spy(realResponse);
@@ -289,5 +288,264 @@ class ResponseTest {
     response.send();
     assertTrue(response.isSent());
     verify(mockOutput).flush();
+  }
+
+  @Test
+  void testDefaultTransferMode() {
+    assertTrue(
+        response.transferMode.equals(TransferMode.DEFAULT)
+    );
+
+    response.send("Normal send");
+    assertTrue(
+        response.transferMode.equals(TransferMode.NORMAL)
+    );
+
+    assertThrows(
+        ChunkedTransferException.class,
+        () -> response.stream()
+    );
+  }
+
+  @Test
+  void testChunkedTransferMode() {
+
+    response.stream();
+    assertTrue(
+        response.isChunked()
+    );
+
+    assertFalse(
+        response.headers.containsKey("content-length")
+    );
+
+    assertTrue(
+        response.headers.containsKey("Transfer-Encoding")
+    );
+
+    assertTrue(
+        () -> {
+          List<String> value = response.headers.get("Transfer-Encoding");
+          if (value.stream().anyMatch("chunked"::equalsIgnoreCase)){
+            return true;
+          }
+          else return false;
+        }
+    );
+  }
+
+  @Test
+  void testSetChunkSize(){
+    response.withChunkSize(400);
+    assertEquals(400, response.chunkSize());
+  }
+
+  @Test
+  void testOutputFlushedChunk() throws IOException{
+    response.stream();
+    verify(mockOutput, atLeastOnce()).flush();
+  }
+
+  @Test
+  void testSendingChunks() throws IOException {
+
+    // 2. Use a real stream to capture raw output easily
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+    response.status(200); // Set explicit status
+
+    assertThrows(
+        ChunkedTransferException.class,
+        () -> response.sendChunk("Hello!")
+    );
+
+    assertThrows(
+        ChunkedTransferException.class,
+        () -> response.sendChunk("Hello!".getBytes(), 0, 6)
+    );
+
+    assertThrows(
+        ChunkedTransferException.class,
+        () -> response.sendChunk("Hello!", 0, 6)
+    );
+
+    assertThrows(
+        ChunkedTransferException.class,
+        () -> response.sendChunk("Hello!".getBytes())
+    );
+
+    response.status(200).stream();
+
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Content-Type: text/plain"));
+    assertTrue(resultOutput.contains("Server: Levtus-v0.2"));
+
+    response
+        .sendChunk("Hello!")
+        .sendChunk("Hello!!", 0, 7)
+        .sendChunk("Hello!!!".getBytes(), 0, 8)
+        .sendChunk("Hello!!!!".getBytes());
+
+    String resultOutputSecond = outputStream.toString(StandardCharsets.UTF_8);
+
+    assertTrue(
+        resultOutputSecond.contains("Hello!!!!")
+    );
+  }
+
+  @Test
+  void testStreamFile_Path_Success() throws IOException {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    response.stream()
+      .streamFile("sample.txt").finishChunkedResponse();
+
+    // Assert
+    assertTrue(response.isSent());
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Hello World"));
+  }
+
+  @Test
+  void testStreamFile_ShouldThrowFileNotFound_WhenFileDoesNotExist() {
+    BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
+    Response response = new Response(mockOutput, tempDir.toString());
+    Path nonExistentFile = tempDir.resolve("ghost.txt");
+
+    // Assert that your custom exception is thrown
+    assertThrows(FileNotFound.class, () -> {
+      response.stream().streamFile(nonExistentFile);
+    });
+    assertThrows(FileNotFound.class, () -> {
+      response.streamFile("ghost.txt");
+    });
+  }
+
+  @Test
+  void testStreamFile_Path_CustomChunkSize() throws IOException {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    response.stream()
+        .streamFile("sample.txt", 400)
+        .finishChunkedResponse();
+
+    // Assert
+    assertTrue(response.isSent());
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Hello World"));
+  }
+
+  @Test
+  void testStreamFile_String_PathTraversal() throws IOException {
+    // Create a file outside the static directory
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.txt");
+    Files.writeString(secretFile, "sensitive data");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Try to access it via traversal
+    assertThrows(PathTraversalException.class, () -> {
+      response.stream().streamFile("../secret.txt");
+    });
+  }
+
+  @Test
+  void testStreamFile_RequiresChunkedMode() throws IOException {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Should throw ChunkedTransferException when not in chunked mode
+    assertThrows(ChunkedTransferException.class, () -> {
+      response.streamFile(testFile);
+    });
+  }
+
+  @Test
+  void testStreamFile_Directory() throws IOException {
+    Path testDir = tempDir.resolve("testdir");
+    Files.createDirectory(testDir);
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Should throw FileNotFound when path is a directory
+    assertThrows(FileNotFound.class, () -> {
+      response.stream().streamFile(testDir);
+    });
+  }
+
+  @Test
+  void testStreamFrom_InputStream_Success() throws IOException {
+    String testData = "Hello World from InputStream";
+    ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    response.stream()
+        .streamFrom(inputStream).finishChunkedResponse();
+
+    // Assert
+    assertTrue(response.isSent());
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(resultOutput.contains("Hello World from InputStream"));
+  }
+
+  @Test
+  void testStreamFrom_InputStream_CustomChunkSize() throws IOException {
+    String testData = "Hello World from InputStream";
+    ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    response.stream()
+        .streamFrom(inputStream, 2).finishChunkedResponse();
+
+    // Assert
+
+    assertTrue(response.isSent());
+    String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(resultOutput.contains("HTTP/1.1 200"));
+    assertTrue(
+        resultOutput.contains("He")
+    );
+    assertTrue(
+        resultOutput.contains("ll")
+    );
+    assertTrue(
+        resultOutput.contains("o")
+    );
+  }
+
+  @Test
+  void testStreamFrom_RequiresChunkedMode() throws IOException {
+    String testData = "Hello World";
+    ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString());
+
+    // Should throw ChunkedTransferException when not in chunked mode
+    assertThrows(ChunkedTransferException.class, () -> {
+      response.streamFrom(inputStream);
+    });
   }
 }

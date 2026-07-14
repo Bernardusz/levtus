@@ -1,14 +1,11 @@
 package io.github.bernardusz.levtus.http;
 
-import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
-import io.github.bernardusz.levtus.exception.developer.FileNotFound;
-import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
-import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
+import io.github.bernardusz.levtus.exception.developer.*;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.io.LevtusInputStream;
 import io.github.bernardusz.levtus.io.StreamConsumer;
 import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -83,22 +80,36 @@ public class LevtusContext {
    *
    * @return the body stream from the socket {@link LevtusInputStream}
    * @throws BodyAlreadyConsumedException if the body has already been consumed
-   * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
+   * @throws LevtusIOException if an I/O error occurs while reading the socket stream
    * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
    *     maxBodySize}
    */
-  public LevtusInputStream bodyStream() {
+  public LevtusInputStream bodyStream() throws BodyAlreadyConsumedException, PayloadTooLargeException, LevtusIOException {
     return req.bodyStream();
   }
 
-  public void bodyStream(StreamConsumer consumer) {
+  /**
+   * Retrieves the body stream of the request. Enforces the configured maximum body size limits to
+   * prevent memory exhaustion (OOM) attacks.
+   *
+   * <p>{@code LevtusInputStream bodyStream = ctx.bodyStream();} {@code InputStream bodyStream =
+   * ctx.bodyStream();}
+   *
+   * @return the body stream from the socket {@link LevtusInputStream}
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
+   * @throws LevtusIOException if an I/O error occurs while reading the socket stream
+   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
+   *     maxBodySize}
+   */
+  public void bodyStream(StreamConsumer consumer) throws LevtusIOException, PayloadTooLargeException, BodyAlreadyConsumedException {
     try (LevtusInputStream lis = this.bodyStream()) {
       consumer.consume(lis);
-    } catch (UncheckedIOException e) {
-      // If it's already wrapped by your stream, unwrap or pass it through
-      throw e;
     } catch (IOException e) {
       // If the developer's lambda logic threw a raw checked IOException
+      throw new LevtusIOException("An I/O error occurred while reading the socket stream", e);
+    } catch (BodyAlreadyConsumedException | PayloadTooLargeException e) {
+      throw e;
+    } catch (RuntimeException e){
       throw new LevtusIOException("Error processing body stream", e);
     }
   }
@@ -112,22 +123,26 @@ public class LevtusContext {
    * @return the raw byte array of the request body
    * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
    *     maxBodySize}
-   * @throws UncheckedIOException if an I/O error occurs while reading the socket stream
+   * @throws LevtusIOException if an I/O error occurs while reading the socket stream
    * @throws BodyAlreadyConsumedException if the body has already been consumed
    */
-  public byte[] body() {
+  public byte[] body() throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
     return req.body();
   }
 
   /**
-   * Retrieves the body of the request in form of String. Enforces the configured maximum body size
-   * limits to prevent memory exhaustion (OOM) attacks.
-   *
-   * <p>{@code String body = ctx.bodyAsString();}
+   * Retrieves the body of the request in form of String. Enforces
+   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
+   * <p>
+   * {@code String body = ctx.bodyAsString();}
    *
    * @return the body of the request as a String
+   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
+   *                                      maxBodySize}
+   * @throws BodyAlreadyConsumedException if the body has already been consumed
+   * @throws LevtusIOException            if an I/O error occurs while reading the socket stream
    */
-  public String bodyAsString() {
+  public String bodyAsString() throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
     return req.bodyAsString();
   }
 
@@ -443,5 +458,236 @@ public class LevtusContext {
   public void sendBinary(String path)
       throws LevtusIOException, FileNotFound, PathTraversalException {
     res.sendBinary(path);
+  }
+
+  /**
+   * Returns the current default chunk size.
+   *
+   * @return the current chunk size
+   */
+  public int chunkSize(){
+    return res.chunkSize();
+  }
+
+  /**
+   * Set the default chunk size
+   *
+   * @param chunkSize the size of each chunk being sent
+   * @return the current Response object to be chained
+   */
+  public LevtusContext withChunkSize(int chunkSize){
+    res.withChunkSize(chunkSize);
+    return this;
+  }
+
+  /**
+   * Changes the responding method to {@link TransferMode#CHUNKED}.
+   *
+   * <p>These following things will happen when you call {@link LevtusContext#stream()}:</p>
+   * <ul>
+   *   <li>The content length header is removed from Response</li>
+   *   <li>Will set the transfer encoding header to chunked</li>
+   *   <li>Will flush all the headers down the socker first</li>
+   * </ul>
+   *
+   * <p>From now on, all method that internally uses {@link Response#sendFile(Path)} or {@link Response#send(byte[])} will throw an exception of {@link ChunkedTransferException} as you cannot switch in the middle of response</p>
+   * <p>All the viable methods of responding with Chunked mode are</p>
+   * <ul>
+   *   <li>{@link LevtusContext#sendChunk(byte[])} to send the chunk directly to the socket (flushed)</li>
+   *   <li>{@link LevtusContext#sendChunk(String)} to send the chunk directly to the socket (flushed)</li>
+   *   <li>{@link LevtusContext#finishChunkedResponse()} to finish the chunked response</li>
+   * </ul>
+   *
+   * <p>Take as a note, that {@link LevtusContext#finishChunkedResponse()} is called in finally block, so it is safe whether you call it or not</p>
+   *
+   * @return the Response object to be chained
+   * @throws ChunkedTransferException if stream is already called or when a bulk sending method has been called earlier
+   * @throws LevtusIOException if an unexpected IO error occurs
+   */
+  public LevtusContext stream() throws LevtusIOException, ChunkedTransferException{
+    res.stream();
+    return this;
+  }
+
+  /**
+   * The method to sends the chunk of data to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>Used to specifically control the offset and length the data is sent</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext sendChunk(byte[] data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+    res.sendChunk(data, offset, length);
+    return this;
+  }
+
+
+  /**
+   * The method to sends the chunk of data to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext sendChunk(byte[] data) throws LevtusIOException, ChunkedTransferException {
+    res.sendChunk(data);
+    return this;
+  }
+
+  /**
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
+   * <p>Used to specifically control the offset and length the data is sent</p>
+   *
+   * @param data the data to be sent to the socker
+   * @param length the length of the data
+   * @param offset the offset of the data
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext sendChunk(String data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+    res.sendChunk(data.getBytes(), offset, length);
+    return this;
+  }
+
+  /**
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext sendChunk(String data) throws LevtusIOException, ChunkedTransferException {
+    res.sendChunk(data.getBytes());
+    return this;
+  }
+
+  /**
+   * The helper method to stream file from the disk to the socket.
+   *
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Used to specifically control the size of each chunk that is sent</p>
+   *
+   * @param path the path of the file being sent
+   * @param chunkSize the size of each chunk
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file that is given is not found
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFile(Path path, int chunkSize) throws FileNotFound,  LevtusIOException, ChunkedTransferException{
+    res.streamFile(path, chunkSize);
+    return this;
+  }
+
+  /**
+   * The helper method to stream file from the disk to the socker.
+   *
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   *
+   * @param path the path of the file being sent
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file that is given is not found
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFile(Path path) throws FileNotFound, LevtusIOException, ChunkedTransferException {
+    res.streamFile(path);
+    return this;
+  }
+
+
+  /**
+   * The helper method to stream file from the disk to the socket.
+   *
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Used to specifically control the size of each chunk that is sent</p>
+   *
+   * @param path the path of the file being sent relative to {@link Response#staticFilesPath}
+   * @param chunkSize the size of each chunk
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file that is given is not found
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFile(String path, int chunkSize) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    streamFile(path, chunkSize);
+    return this;
+  }
+
+  /**
+   * The helper method to stream file from the disk to the socker.
+   *
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   *
+   * @param path the path of the file being sent relative to {@link Response#staticFilesPath}
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file that is given is not found
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    streamFile(path);
+    return this;
+  }
+
+  /**
+   * The method to stream from an input stream to the socket output stream.
+   *
+   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Used to specifically control the size of each chunk that is sent</p>
+   *
+   * @param is the input stream for the data source
+   * @param chunkSize the size of each chunk being sent
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFrom(InputStream is, int chunkSize) throws LevtusIOException, ChunkedTransferException {
+    res.streamFrom(is, chunkSize);
+    return this;
+  }
+
+  /**
+   * The method to stream from an input stream to the socket output stream.
+   *
+   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   *
+   * @param is the input stream for the data source
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public LevtusContext streamFrom(InputStream is) throws LevtusIOException, ChunkedTransferException {
+    streamFrom(is);
+    return this;
+  }
+
+  /**
+   * The method to send the final CRLF to end the current Response.
+   *
+   * <p>Internally called by the HttpConnectionHandler, it is optional to call this method or leave it as is</p>
+   *
+   * @throws LevtusIOException if an unexpected IO error occurs
+   */
+  public void finishChunkedResponse() throws LevtusIOException {
+    res.finishChunkedResponse();
   }
 }
