@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 
 import io.github.bernardusz.levtus.exception.http.BadRequestException;
 import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
@@ -222,7 +221,7 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseHeadersHeaderNotImplemented() {
+  void testParseHeadersHeaderImplemented() {
     String requestLine =
         "Host: localhost:8080\r\n"
             + "User-Agent: Mozilla/5.0\r\n"
@@ -232,8 +231,8 @@ class HttpParserTest {
     InputStream mockInputStream =
         new ByteArrayInputStream(requestLine.getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(
-        LevtusNotImplementedException.class, () -> parser.parseHeaders(mockInputStream, 8192, 20));
+    assertDoesNotThrow(
+        () -> parser.parseHeaders(mockInputStream, 8192, 20));
   }
 
   @Test
