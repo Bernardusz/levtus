@@ -15,12 +15,20 @@ class HttpConnectionHandler implements ConnectionHandler {
   final Router router;
   final HttpParser parser;
   private int maxEmptyLines = 10;
-  private int maxBodySize = 10 * 1024 * 1024;
+  private long maxBodySize = 10 * 1024 * 1024;
   private int maxHeaderCount = 100;
   private int maxLineSize = 8192; // 8 KB Limit
   private int maxHeaderSize = 8192; // 8 KB Limit
   private String staticFilesPath = "./public";
+  private long maxChunkSize = 1024 * 1024; // 1 MB Limit
+  private long maxChunkCount = 1000;
 
+  /**
+   * The constructor for HttpConnectionHandler.
+   *
+   * @param router the router for HTTP Handler
+   * @param parser the parser for HTTP Parser
+   */
   public HttpConnectionHandler(Router router, HttpParser parser) {
     this.router = router;
     this.parser = parser;
@@ -36,24 +44,39 @@ class HttpConnectionHandler implements ConnectionHandler {
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
         OutputStream outputStream = client.getOutputStream()) {
       client.setSoTimeout(5000);
-      Response res = new Response(outputStream, staticFilesPath);
-
+      Response res = new Response(outputStream, staticFilesPath, false); // At first, it is false,
+      // Because we won't continue sending responses after the error
       try {
         Request req;
         while ((req = parser.parseRequest(this, inputStream, res)) != null) {
-          res = new Response(outputStream, staticFilesPath);
+          res = new Response(outputStream, staticFilesPath, req.isKeepAlive()); // Now when we respond, that's when the isKeepAlive is needed
           client.setSoTimeout(20000);
           router.handle(req, res);
-          if (!res.isSent()) {
-            res.status(404).send("404 - Not Found");
+          if (!res.isSent()){
+            if (res.isChunked()){
+              res.finishChunkedResponse();
+            }
+            else {
+              res.status(404).send("404 - Not Found");
+            }
           }
           try {
-            if (!req.isCached()) {
-              inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+            if (!req.isCached()){
+              if (req.isChunked()){
+                req.body();
+              }
+              else {
+                inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+              }
             }
           } catch (EOFException e) {
             break;
           }
+
+          if (!req.isKeepAlive()) {
+            break;
+          }
+
         }
       } catch (IllegalArgumentException e) {
         res.status(400).send("400 - Bad Request (Malformed URL)");
@@ -64,6 +87,8 @@ class HttpConnectionHandler implements ConnectionHandler {
       } catch (Exception e) {
         res.status(500).send("500 - Internal Server Error");
         throw e;
+      } finally {
+        res.finishChunkedResponse();
       }
 
     } catch (Exception e) {
@@ -95,7 +120,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max body size in a request
    */
-  int getMaxBodySize() {
+  long getMaxBodySize() {
     return maxBodySize;
   }
 
@@ -104,7 +129,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @param maxBodySize the max body size
    */
-  public void setMaxBodySize(int maxBodySize) {
+  public void setMaxBodySize(long maxBodySize) {
     this.maxBodySize = maxBodySize;
   }
 
@@ -160,6 +185,22 @@ class HttpConnectionHandler implements ConnectionHandler {
    */
   public void setMaxHeaderSize(int maxHeaderSize) {
     this.maxHeaderSize = maxHeaderSize;
+  }
+
+  long getMaxChunkSize() {
+    return maxChunkSize;
+  }
+
+  public void setMaxChunkSize(int maxChunkSize) {
+    this.maxChunkSize = maxChunkSize;
+  }
+
+  long getMaxChunkCount() {
+    return maxChunkCount;
+  }
+
+  public void setMaxChunkCount(long maxChunkCount) {
+    this.maxChunkCount = maxChunkCount;
   }
 
   /**

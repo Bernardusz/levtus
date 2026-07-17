@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 
 import io.github.bernardusz.levtus.exception.http.BadRequestException;
 import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
@@ -222,7 +221,7 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseHeadersHeaderNotImplemented() {
+  void testParseHeadersHeaderImplemented() {
     String requestLine =
         "Host: localhost:8080\r\n"
             + "User-Agent: Mozilla/5.0\r\n"
@@ -232,8 +231,8 @@ class HttpParserTest {
     InputStream mockInputStream =
         new ByteArrayInputStream(requestLine.getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(
-        LevtusNotImplementedException.class, () -> parser.parseHeaders(mockInputStream, 8192, 20));
+    assertDoesNotThrow(
+        () -> parser.parseHeaders(mockInputStream, 8192, 20));
   }
 
   @Test
@@ -495,5 +494,38 @@ class HttpParserTest {
     String nullByteRequest = "GET /foo%00bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is4 = new ByteArrayInputStream(nullByteRequest.getBytes(StandardCharsets.UTF_8));
     assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is4, mockResponse));
+  }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_1() {
+    String requestLine = "GET / HTTP/1.1";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_1, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_0() {
+    String requestLine = "GET / HTTP/1.0";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_0, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidRequestLine() {
+    String badRequestLine = "GET";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(badRequestLine));
+  }
+
+  @Test
+  void testParseHttpProtocol_UnsupportedVersion() {
+    String unsupportedVersion = "GET / HTTP/2.0";
+    assertThrows(io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException.class, 
+        () -> parser.parseHttpProtocol(unsupportedVersion));
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidVersionFormat() {
+    String invalidVersion = "GET / HTTP/invalid";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(invalidVersion));
   }
 }

@@ -43,14 +43,15 @@ class HttpParser {
    *
    * @param handler The handler that uses HttpParser for parsing
    * @param inputStream The stream to read the HTTP request from
-   * @param response The response object to be used for sending responses for accepting 100-Continue request
+   * @param response The response object to be used for sending responses for accepting 100-Continue
+   *     request
    * @return {@link Request} A fully parsed Request object, or null if the stream is empty
    * @throws IOException If a network or stream error occurs
    * @throws BadRequestException If the request line is invalid or headers are malformed
    * @throws PayloadTooLargeException If the request's body size exceeds {@link
    *     LevtusEngine#getMaxBodySize()} or {@link HttpConnectionHandler#getMaxBodySize()}, set via
-   *     {@link LevtusEngine#setMaxBodySize(int)} or {@link
-   *     HttpConnectionHandler#setMaxBodySize(int)}
+   *     {@link LevtusEngine#setMaxBodySize(long)} or {@link
+   *     HttpConnectionHandler#setMaxBodySize(long)}
    * @throws HeaderTooLargeException If the header's total size exceeds {@link
    *     LevtusEngine#getMaxHeaderSize()} or {@link HttpConnectionHandler#getMaxHeaderSize()}, set
    *     via {@link LevtusEngine#setMaxHeaderSize(int)} or {@link
@@ -71,6 +72,7 @@ class HttpParser {
     }
 
     String method = parseMethod(requestLine);
+    HttpProtocol protocol = parseHttpProtocol(requestLine);
 
     // Parse the Header
     Map<String, List<String>> headers =
@@ -105,7 +107,16 @@ class HttpParser {
     validateBodySize(headers, limit, response);
 
     return new Request(
-        method, normalizedPath, headers, queryParams, inputStream, handler.getMaxBodySize());
+        method,
+        normalizedPath,
+        headers,
+        queryParams,
+        inputStream,
+        handler.getMaxBodySize(),
+        handler.getMaxChunkSize(),
+        handler.getMaxChunkCount(),
+        protocol
+    );
   }
 
   /**
@@ -143,7 +154,7 @@ class HttpParser {
   String parseMethod(String requestLine) throws BadRequestException {
     String[] parts = requestLine.split(" ", 3);
     if (parts.length != 3) {
-      throw new BadRequestException("400 - Bad Request");
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
     }
 
     if (!parts[2].matches("HTTP/1\\.[01]")) {
@@ -156,6 +167,32 @@ class HttpParser {
 
     return parts[0];
   }
+
+  /**
+   * The helper method for parsing the protocol of an HTTP request.
+   *
+   * @param requestLine the parsed request line
+   * @return the HttpProtocol in the form of an enum {@link HttpProtocol}
+   * @throws BadRequestException if the request line is invalid or the HTTP version is not supported
+   * @throws LevtusNotImplementedException if the HTTP version is not supported
+   */
+  HttpProtocol parseHttpProtocol(String requestLine) throws BadRequestException, LevtusNotImplementedException {
+    String[] parts = requestLine.split(" ", 3);
+    if (parts.length != 3) {
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
+    }
+
+    if (!parts[2].matches("HTTP/1\\.[01]")) {
+      if (parts[2].matches("HTTP/[0-9]+\\.[0-9]+")) {
+        throw new LevtusNotImplementedException("505 - Unsupported HTTP version");
+      } else {
+        throw new BadRequestException("400 - Bad Request (Invalid HTTP version)");
+      }
+    }
+
+    return parts[2].matches("HTTP/1.1") ? HttpProtocol.HTTP_1_1 : HttpProtocol.HTTP_1_0;
+  }
+
 
   /**
    * The helper method for parsing the headers of an HTTP request.
@@ -204,9 +241,6 @@ class HttpParser {
     if (headers.get("host").size() > 1) {
       throw new BadRequestException("400 - Bad Request (Duplicate host header)");
     }
-    if (headers.get("transfer-encoding") != null) {
-      throw new LevtusNotImplementedException(headers.get("transfer-encoding").getFirst());
-    }
 
     return headers;
   }
@@ -230,29 +264,47 @@ class HttpParser {
    */
   void validateBodySize(Map<String, List<String>> headers, long maxBodySize, Response response)
       throws PayloadTooLargeException, BadRequestException {
-    int contentLength;
-    List<String> lengthStrList =
-        headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
-    if (lengthStrList.size() > 1) {
-      throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
-    }
-    String lengthStr = lengthStrList.getFirst();
-    if (lengthStr != null && !lengthStr.isEmpty()) {
-      try {
-        contentLength = Integer.parseInt(lengthStr);
-        if (contentLength > maxBodySize) {
-          throw new PayloadTooLargeException(
-              "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
+    List<String> chunkedHeaders = headers.get("transfer-encoding");
+
+    boolean isChunked =
+        chunkedHeaders != null
+            && !chunkedHeaders.isEmpty()
+            && chunkedHeaders.stream().anyMatch("chunked"::equalsIgnoreCase);
+
+    if (isChunked) {
+      headers.remove("content-length");
+    } else {
+      int contentLength;
+      List<String> lengthStrList =
+          headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
+
+      if (lengthStrList != null) {
+        if (lengthStrList.isEmpty()) {
+          throw new BadRequestException("400 - Bad Request (Missing content-length header)");
         }
-        List<String> expectHeaders = headers.get("expect");
-        if (expectHeaders != null
-            && !expectHeaders.isEmpty()
-            && expectHeaders.getFirst().equalsIgnoreCase("100-continue")) {
-          response.status(100).send();
+
+        if (lengthStrList.size() > 1) {
+          throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
         }
-      } catch (NumberFormatException e) {
-        throw new BadRequestException("400 - Bad Request (Content Length is invalid)");
+        String lengthStr = lengthStrList.getFirst();
+        try {
+          contentLength = Integer.parseInt(lengthStr);
+          if (contentLength > maxBodySize) {
+            throw new PayloadTooLargeException(
+                "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
+          }
+
+        } catch (NumberFormatException e) {
+          throw new BadRequestException("400 - Bad Request (Content Length is invalid)");
+        }
       }
+    }
+    List<String> expectHeaders = headers.get("expect");
+
+    if (expectHeaders != null
+        && !expectHeaders.isEmpty()
+        && expectHeaders.getFirst().equalsIgnoreCase("100-continue")) {
+      response.status(100).send();
     }
   }
 

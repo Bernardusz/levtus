@@ -1,5 +1,6 @@
 package io.github.bernardusz.levtus.http;
 
+import io.github.bernardusz.levtus.exception.developer.ChunkedTransferException;
 import io.github.bernardusz.levtus.exception.developer.FileNotFound;
 import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
 import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
@@ -10,10 +11,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Represents an outgoing HTTP/1.1 response.
@@ -29,7 +27,10 @@ public class Response {
 
   int statusCode = 200;
   Map<String, List<String>> headers = new HashMap<>();
+  TransferMode transferMode = TransferMode.DEFAULT;
   private boolean isSent = false;
+  private int chunkSize = 64 * 1024;
+  private final boolean isKeepAlive;
 
   /**
    * Initializes a new HTTP response bound to a client socket's output stream.
@@ -37,10 +38,12 @@ public class Response {
    * @implNote Automatically injects default headers like "Content-Type" and "Server".
    * @param output the buffered output stream connected to the client (must not be null)
    * @param staticFilesPath the directory path for resolving static files (must not be null)
+   * @param isKeepAlive whether the connection should be kept alive after the response is sent
    */
-  public Response(OutputStream output, String staticFilesPath) {
+  public Response(OutputStream output, String staticFilesPath, boolean isKeepAlive) {
     this.output = output;
     this.staticFilesPath = staticFilesPath;
+    this.isKeepAlive = isKeepAlive;
   }
 
   /**
@@ -240,7 +243,11 @@ public class Response {
    */
   public void send(byte[] bodyBytes) throws LevtusIOException {
     if (isSent) return;
+    if (transferMode.equals(TransferMode.CHUNKED)){
+      throw new ChunkedTransferException("Not allowed to switch mid response");
+    }
 
+    transferMode = TransferMode.NORMAL;
     headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
     headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.1")));
 
@@ -266,7 +273,11 @@ public class Response {
    */
   public void sendFile(Path path) throws LevtusIOException, FileNotFound {
     if (isSent) return;
+    if (transferMode.equals(TransferMode.CHUNKED)){
+      throw new ChunkedTransferException("Not allowed to switch mid response");
+    }
 
+    transferMode = TransferMode.NORMAL;
     headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
     headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.2")));
 
@@ -351,7 +362,373 @@ public class Response {
     sendBinary(filePath);
   }
 
+  /**
+   * The method to check the current responding answer, is it {@link TransferMode#NORMAL} or {@link TransferMode#CHUNKED}
+   *
+   * @return true if the response is in chunked mode, false otherwise
+   */
+  public boolean isChunked() {
+    return transferMode == TransferMode.CHUNKED;
+  }
+
+  /**
+   * Returns the current default chunk size.
+   *
+   * @return the current chunk size
+   */
+  public int chunkSize(){
+    return chunkSize;
+  }
+
+  /**
+   * Set the default chunk size
+   *
+   * @param chunkSize the size of each chunk being sent
+   * @return the current Response object to be chained
+   */
+  public Response withChunkSize(int chunkSize){
+    this.chunkSize = chunkSize;
+    return this;
+  }
+
+  /**
+   * Changes the responding method to {@link TransferMode#CHUNKED}.
+   *
+   * <p>These following things will happen when you call {@link Response#stream()}:</p>
+   * <ul>
+   *   <li>The content length header is removed from Response</li>
+   *   <li>Will set the transfer encoding header to chunked</li>
+   *   <li>Will flush all the headers down the socker first</li>
+   * </ul>
+   *
+   * <p>From now on, all method that internally uses {@link Response#sendFile(Path)} or {@link Response#send(byte[])} will throw an exception of {@link ChunkedTransferException} as you cannot switch in the middle of response</p>
+   * <p>All the viable methods of responding with Chunked mode are</p>
+   * <ul>
+   *   <li>{@link Response#sendChunk(byte[])} to send the chunk directly to the socket (flushed)</li>
+   *   <li>{@link Response#sendChunk(String)} to send the chunk directly to the socket (flushed)</li>
+   *   <li>{@link Response#streamFile(Path)} to stream a file from disk in chunks (buffered transfer)</li>
+   *   <li>{@link Response#streamFrom(InputStream)} to stream from any InputStream in chunks</li>
+   *   <li>{@link Response#finishChunkedResponse()} to finish the chunked response</li>
+   * </ul>
+   *
+   * <p>Take as a note, that {@link Response#finishChunkedResponse()} is called in finally block, so it is safe whether you call it or not</p>
+   *
+   * @return the Response object to be chained
+   * @throws ChunkedTransferException if stream is already called or when a bulk sending method has been called earlier
+   * @throws LevtusIOException if an unexpected IO error occurs
+   */
+  public Response stream() throws LevtusIOException, ChunkedTransferException{
+    switch (transferMode){
+      case TransferMode.NORMAL -> throw new ChunkedTransferException("Not allowed to switch transfer mode mid response");
+      case TransferMode.CHUNKED -> throw new ChunkedTransferException("Response is already in CHUNKED streaming");
+    }
+
+    this.transferMode = TransferMode.CHUNKED;
+    if (this.headers != null) {
+      this.headers.remove("Content-Length");
+    }
+    this.header("Transfer-Encoding", "chunked");
+
+    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
+    headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.2")));
+
+    try{
+      writeStatus(statusCode);
+      writeHeaders();
+      output.flush();
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+
+    return this;
+  }
+
+  /**
+   * The method to sends the chunk of data to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>Used to specifically control the offset and length the data is sent</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response sendChunk(byte[] data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+    switch (transferMode){
+      case TransferMode.NORMAL -> throw new ChunkedTransferException("Not allowed to switch transfer mode mid response");
+      case TransferMode.DEFAULT -> throw new ChunkedTransferException("Forget to change the mode to stream");
+      default -> {}
+    }
+
+    if (data == null || length == 0) return this;
+
+    try {
+      String hexSizeLine = Integer.toHexString(length) + "\r\n";
+
+      output.write(hexSizeLine.getBytes(StandardCharsets.US_ASCII));
+      output.write(data, offset, length);
+      output.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+
+      output.flush();
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+
+    return this;
+  }
+
+
+  /**
+   * The method to sends the chunk of data to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response sendChunk(byte[] data) throws LevtusIOException, ChunkedTransferException {
+    switch (transferMode){
+      case TransferMode.NORMAL -> throw new ChunkedTransferException("Not allowed to switch transfer mode mid response");
+      case TransferMode.DEFAULT -> throw new ChunkedTransferException("Forget to change the mode to stream");
+      default -> {}
+    }
+
+    if (data == null || data.length == 0) return this;
+
+    try {
+      String hexSizeLine = Integer.toHexString(data.length) + "\r\n";
+
+      output.write(hexSizeLine.getBytes(StandardCharsets.US_ASCII));
+      output.write(data);
+      output.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+
+      output.flush();
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+
+    return this;
+  }
+
+  /**
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
+   * <p>Used to specifically control the offset and length the data is sent</p>
+   *
+   * @param data the data to be sent to the socker
+   * @param length the length of the data
+   * @param offset the offset of the data
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response sendChunk(String data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+    return sendChunk(data.getBytes(), offset, length);
+  }
+
+  /**
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   *
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
+   *
+   * @param data the data to be sent to the socker
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response sendChunk(String data) throws LevtusIOException, ChunkedTransferException {
+    return sendChunk(data.getBytes());
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file is read into
+   * a buffer and sent as chunks with proper chunk headers. This is different from {@link #sendFile(Path)}
+   * which uses zero-copy NIO transfer and cannot be used in chunked mode.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param path the absolute path of the file being sent
+   * @param chunkSize the size of each chunk in bytes
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamFile(Path path, int chunkSize) throws FileNotFound, LevtusIOException, ChunkedTransferException{
+    if (!Files.exists(path) || Files.isDirectory(path)) {
+      throw new FileNotFound("File not found (absolute path): " + path);
+    }
+
+    try (InputStream is = Files.newInputStream(path)) {
+      byte[] buffer = new byte[chunkSize];
+      int bytesRead;
+      while ((bytesRead = is.read(buffer)) > 0) {
+        sendChunk(buffer, 0, bytesRead);
+      }
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file is read into a buffer and sent as chunks with proper
+   * chunk headers. This is different from {@link #sendFile(Path)} which uses zero-copy NIO transfer
+   * and cannot be used in chunked mode.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param path the absolute path of the file being sent
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamFile(Path path) throws FileNotFound, LevtusIOException, ChunkedTransferException {
+    return streamFile(path, chunkSize);
+  }
+
+
+  /**
+   * Streams a file from disk to the socket in chunked mode with configurable chunk size.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file path is resolved
+   * relative to the configured static files directory. Path traversal attacks are prevented by
+   * validating the resolved path stays within the static directory.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @param chunkSize the size of each chunk in bytes
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response streamFile(String path, int chunkSize) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    Path filePath = Path.of(staticFilesPath, path).normalize();
+    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
+
+    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
+      throw new PathTraversalException("Path traversal detected");
+    }
+
+    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+      throw new FileNotFound("File not found (relative path): " + path);
+    }
+
+    return streamFile(filePath, chunkSize);
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response streamFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    return streamFile(path, chunkSize);
+  }
+
+  /**
+   * Streams data from an InputStream to the socket in chunked mode with configurable chunk size.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The InputStream is read
+   * into a buffer and sent as chunks with proper chunk headers. This is useful for streaming data
+   * from databases, external APIs, or proxying request bodies.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param is the input stream to read data from
+   * @param chunkSize the size of each chunk in bytes
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamFrom(InputStream is, int chunkSize) throws LevtusIOException, ChunkedTransferException {
+    try {
+      byte[] buffer = new byte[chunkSize];
+      int bytesRead;
+      while ((bytesRead = is.read(buffer)) > 0) {
+        sendChunk(buffer, 0, bytesRead);
+      }
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+    return this;
+  }
+
+  /**
+   * Streams data from an InputStream to the socket in chunked mode using the default chunk size.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The InputStream is read into a buffer and sent as chunks with
+   * proper chunk headers. This is useful for streaming data from databases, external APIs, or
+   * proxying request bodies.</p>
+   *
+   * <p>Requires {@link #stream()} to be called first to enable chunked transfer mode.</p>
+   *
+   * @param is the input stream to read data from
+   * @return the Response object to be chained
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamFrom(InputStream is) throws LevtusIOException, ChunkedTransferException {
+    return streamFrom(is, chunkSize);
+  }
+
+  /**
+   * The method to send the final CRLF to end the current Response.
+   *
+   * <p>Internally called by the HttpConnectionHandler, it is optional to call this method or leave it as is</p>
+   *
+   * @throws LevtusIOException if an unexpected IO error occurs
+   */
+  public void finishChunkedResponse() throws LevtusIOException {
+    if (transferMode != TransferMode.CHUNKED || isSent()){
+      return;
+    }
+
+    try {
+      output.write("0\r\n\r\n".getBytes());
+      output.flush();
+      isSent = true;
+    }
+    catch (IOException e){
+      throw new LevtusIOException(e.getMessage(), e);
+    }
+  }
+
   private void writeHeaders() throws IOException {
+    headers.computeIfAbsent("Connection", _ -> new ArrayList<>(List.of(isKeepAlive ? "keep-alive" : "close")));
     for (var entry : headers.entrySet()) {
       for (var headerValue : entry.getValue()) {
         output.write(
@@ -362,13 +739,7 @@ public class Response {
   }
   private void writeHeaders(long contentLength) throws IOException {
     headers.put("Content-Length", new ArrayList<>(List.of(String.valueOf(contentLength))));
-    for (var entry : headers.entrySet()) {
-      for (var headerValue : entry.getValue()) {
-        output.write(
-            (purifyHeader(entry.getKey()) + ": " + purifyHeader(headerValue) + "\r\n").getBytes());
-      }
-    }
-    output.write("\r\n".getBytes());
+    writeHeaders();
   }
 
   private void writeBody(byte[] bodyBytes) throws IOException {

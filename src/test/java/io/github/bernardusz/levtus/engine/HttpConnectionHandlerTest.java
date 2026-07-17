@@ -139,4 +139,13 @@ class HttpConnectionHandlerTest {
     handler.setMaxEmptyLines(5);
     assertEquals(5, handler.getMaxEmptyLines());
   }
+
+  @Test
+  void testChunkSizeAttribute() {
+    handler.setMaxChunkSize(1024);
+    assertEquals(1024, handler.getMaxChunkSize());
+
+    handler.setMaxChunkCount(1000);
+    assertEquals(1000, handler.getMaxChunkCount());
+  }
 }

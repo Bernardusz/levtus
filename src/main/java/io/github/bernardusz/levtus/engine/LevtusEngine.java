@@ -121,7 +121,7 @@ public class LevtusEngine {
    *
    * @return return the max body size in a request
    */
-  int getMaxBodySize() {
+  long getMaxBodySize() {
     return handler.getMaxBodySize();
   }
 
@@ -130,7 +130,7 @@ public class LevtusEngine {
    *
    * @param maxBodySize the max body size
    */
-  public void setMaxBodySize(int maxBodySize) {
+  public void setMaxBodySize(long maxBodySize) {
     handler.setMaxBodySize(maxBodySize);
   }
 
