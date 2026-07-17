@@ -90,17 +90,28 @@ public class LevtusContext {
   }
 
   /**
-   * Retrieves the body stream of the request. Enforces the configured maximum body size limits to
-   * prevent memory exhaustion (OOM) attacks.
+   * Consumes the request body as a continuous stream via a functional interface.
    *
-   * <p>{@code LevtusInputStream bodyStream = ctx.bodyStream();} {@code InputStream bodyStream =
-   * ctx.bodyStream();}
+   * <p>This method provides a safe, resource-managed way to process large incoming payloads
+   * (e.g., file uploads) piece by piece without buffering the entire body into memory. The underlying
+   * socket stream is automatically managed and safely closed using a try-with-resources block
+   * once the consumer completes execution.
    *
-   * @return the body stream from the socket {@link LevtusInputStream}
-   * @throws BodyAlreadyConsumedException if the body has already been consumed
-   * @throws LevtusIOException if an I/O error occurs while reading the socket stream
-   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
-   *     maxBodySize}
+   * <p><b>Usage Example:</b>
+   * <pre>{@code
+   * ctx.bodyStream(stream -> {
+   * byte[] buffer = new byte[8192];
+   * int read;
+   * while ((read = stream.read(buffer)) != -1) {
+   * out.write(buffer, 0, read);
+   * }
+   * });
+   * }</pre>
+   *
+   * @param consumer the functional stream handler that will process the raw stream bytes
+   * @throws LevtusIOException if an underlying socket error occurs or if user logic throws an I/O error
+   * @throws PayloadTooLargeException if the streamed body exceeds the configured server limits
+   * @throws BodyAlreadyConsumedException if the request body has already been read by an alternate method
    */
   public void bodyStream(StreamConsumer consumer)
       throws LevtusIOException, PayloadTooLargeException, BodyAlreadyConsumedException {
@@ -531,6 +542,8 @@ public class LevtusContext {
    * <p>Used to specifically control the offset and length the data is sent
    *
    * @param data the data to be sent to the socker
+   * @param offset the offset of the data to be sent
+   * @param length the length of the data to be sent
    * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
    * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
@@ -753,14 +766,12 @@ public class LevtusContext {
    *
    * @param path the file path to send
    * @param filename the name of the file to send
-   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    */
-  public LevtusContext downloadFile(Path path, String filename)
+  public void downloadFile(Path path, String filename)
       throws LevtusIOException, FileNotFound {
     res.downloadFile(path, filename);
-    return this;
   }
 
   /**
@@ -773,15 +784,13 @@ public class LevtusContext {
    *
    * @param path the relative file path to send
    * @param filename the name of the file to send
-   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    * @throws PathTraversalException if the path contains traversal characters
    */
-  public LevtusContext downloadFile(String path, String filename)
+  public void downloadFile(String path, String filename)
       throws LevtusIOException, FileNotFound, PathTraversalException {
     res.downloadFile(path, filename);
-    return this;
   }
 
   /**
@@ -793,13 +802,11 @@ public class LevtusContext {
    * <p>Internally use {@link Response#download(String)} to set the response as downloadable
    *
    * @param path the file path to send
-   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    */
-  public LevtusContext downloadFile(Path path) throws LevtusIOException, FileNotFound {
+  public void downloadFile(Path path) throws LevtusIOException, FileNotFound {
     res.downloadFile(path);
-    return this;
   }
 
   /**
@@ -811,15 +818,13 @@ public class LevtusContext {
    * <p>Internally use {@link Response#download(String)} to set the response as downloadable
    *
    * @param path the relative file path to send
-   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    * @throws PathTraversalException if the path contains traversal characters
    */
-  public LevtusContext downloadFile(String path)
+  public void downloadFile(String path)
       throws LevtusIOException, FileNotFound, PathTraversalException {
     res.downloadFile(path);
-    return this;
   }
 
   /**

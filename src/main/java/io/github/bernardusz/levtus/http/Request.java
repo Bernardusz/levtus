@@ -214,6 +214,11 @@ public class Request {
     return activeStream != null ? activeStream.getBytesRead() : 0;
   }
 
+  /**
+   * Checks whether the request body is chunked.
+   *
+   * @return true if the request body is chunked, false otherwise
+   */
   public boolean isChunked() {
     String isChunked = header("Transfer-Encoding");
     return isChunked.equalsIgnoreCase("chunked");

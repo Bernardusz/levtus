@@ -369,10 +369,9 @@ public class Response {
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    */
-  public Response downloadFile(Path path, String filename) throws LevtusIOException, FileNotFound {
+  public void downloadFile(Path path, String filename) throws LevtusIOException, FileNotFound {
     header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
     sendFile(path);
-    return this;
   }
 
   /**
@@ -389,10 +388,9 @@ public class Response {
    * @throws FileNotFound if the file does not exist or is a directory
    * @throws PathTraversalException if the path contains traversal characters
    */
-  public Response downloadFile(String path, String filename)
+  public void downloadFile(String path, String filename)
       throws LevtusIOException, FileNotFound, PathTraversalException {
     downloadFile(checkPath(path), filename);
-    return this;
   }
 
   /**
@@ -407,9 +405,8 @@ public class Response {
    * @throws LevtusIOException if an I/O error occurs while transferring the file
    * @throws FileNotFound if the file does not exist or is a directory
    */
-  public Response downloadFile(Path path) throws LevtusIOException, FileNotFound {
+  public void downloadFile(Path path) throws LevtusIOException, FileNotFound {
     downloadFile(path, path.getFileName().toString());
-    return this;
   }
 
   /**
@@ -425,10 +422,9 @@ public class Response {
    * @throws FileNotFound if the file does not exist or is a directory
    * @throws PathTraversalException if the path contains traversal characters
    */
-  public Response downloadFile(String path)
+  public void downloadFile(String path)
       throws LevtusIOException, FileNotFound, PathTraversalException {
     downloadFile(checkPath(path));
-    return this;
   }
 
   /**
@@ -531,7 +527,9 @@ public class Response {
    *
    * <p>Used to specifically control the offset and length the data is sent
    *
-   * @param data the data to be sent to the socker
+   * @param data the data to be sent to the socket
+   * @param offset the offset of the data to be sent
+   * @param length the length of the data to be sent
    * @return the Response object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
    * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
