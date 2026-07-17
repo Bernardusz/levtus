@@ -1,0 +1,8 @@
+# .github/labeler.yml
+# Adds the 'java' label to any PR that touches .java files
+java:
+  - '**/*.java'
+
+# Adds the 'ci' label if you touch the workflow files
+ci:
+  - '.github/workflows/**/*'
