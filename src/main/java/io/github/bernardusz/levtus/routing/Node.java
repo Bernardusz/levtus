@@ -61,9 +61,11 @@ public class Node {
   /**
    * The maximum body size of the request body in bytes.
    *
-   * <p>If set to a positive value, the request body will be limited to this size.</p>
-   * <p>If set to -1, the request body will be limited to global size</p>
-   * <p>If set to 0, the request will not accept a body</p>
+   * <p>If set to a positive value, the request body will be limited to this size.
+   *
+   * <p>If set to -1, the request body will be limited to global size
+   *
+   * <p>If set to 0, the request will not accept a body
    *
    * @return the maximum body size
    */

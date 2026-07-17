@@ -115,8 +115,7 @@ class HttpParser {
         handler.getMaxBodySize(),
         handler.getMaxChunkSize(),
         handler.getMaxChunkCount(),
-        protocol
-    );
+        protocol);
   }
 
   /**
@@ -176,7 +175,8 @@ class HttpParser {
    * @throws BadRequestException if the request line is invalid or the HTTP version is not supported
    * @throws LevtusNotImplementedException if the HTTP version is not supported
    */
-  HttpProtocol parseHttpProtocol(String requestLine) throws BadRequestException, LevtusNotImplementedException {
+  HttpProtocol parseHttpProtocol(String requestLine)
+      throws BadRequestException, LevtusNotImplementedException {
     String[] parts = requestLine.split(" ", 3);
     if (parts.length != 3) {
       throw new BadRequestException("400 - Bad Request (Invalid request line)");
@@ -192,7 +192,6 @@ class HttpParser {
 
     return parts[2].matches("HTTP/1.1") ? HttpProtocol.HTTP_1_1 : HttpProtocol.HTTP_1_0;
   }
-
 
   /**
    * The helper method for parsing the headers of an HTTP request.

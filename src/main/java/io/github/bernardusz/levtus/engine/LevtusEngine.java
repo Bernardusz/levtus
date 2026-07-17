@@ -204,7 +204,7 @@ public class LevtusEngine {
    *
    * @param initialSocketTimeout the initial socket timeout
    */
-  public void setInitialSocketTimeout(int initialSocketTimeout){
+  public void setInitialSocketTimeout(int initialSocketTimeout) {
     handler.setInitialSocketTimeout(initialSocketTimeout);
   }
 
@@ -213,7 +213,7 @@ public class LevtusEngine {
    *
    * @param processingSocketTimeout the processing socket timeout
    */
-  public void setProcessingSocketTimeout(int processingSocketTimeout){
+  public void setProcessingSocketTimeout(int processingSocketTimeout) {
     handler.setProcessingSocketTimeout(processingSocketTimeout);
   }
 

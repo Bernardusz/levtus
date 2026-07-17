@@ -226,21 +226,21 @@ class HttpConnectionHandler implements ConnectionHandler {
   }
 
   /**
-   * Get the processing socket timeout for all incoming HTTP requests.
-   *
-   * @return return the processing socket timeout for all incoming HTTP requests
-   */
-  int getProcessingSocketTimeout() {
-    return processingSocketTimeout;
-  }
-
-  /**
    * Set the initial socket timeout for all incoming HTTP requests
    *
    * @param initialSocketTimeout the initial socket timeout
    */
   public void setInitialSocketTimeout(int initialSocketTimeout){
     this.initialSocketTimeout = initialSocketTimeout;
+  }
+
+  /**
+   * Get the processing socket timeout for all incoming HTTP requests.
+   *
+   * @return return the processing socket timeout for all incoming HTTP requests
+   */
+  int getProcessingSocketTimeout() {
+    return processingSocketTimeout;
   }
 
   /**

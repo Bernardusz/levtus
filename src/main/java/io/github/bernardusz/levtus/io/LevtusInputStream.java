@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * A custom InputStream that enforces the maximum size of the body to read data safely.
- * <br>
+ * A custom InputStream that enforces the maximum size of the body to read data safely. <br>
+ *
  * <p>{@code LevtusInputStream stream = new LevtusInputStream(inputStream, maxBodySize,
  * contentLength);}
  *
@@ -23,18 +23,25 @@ public class LevtusInputStream extends InputStream {
 
   /** The content length of the request. */
   private final long contentLength;
+
   /** The transfer mode of the request. */
   private final boolean isChunked;
+
   /** The maximum chunk size to be read, per route enforced. */
   private final long maxChunkSize;
+
   /** The maximum number of chunks to be read, per route enforced. */
   private final long maxChunkCount;
+
   /** The number of bytes that has been read from the stream. */
   private long bytesRead = 0;
+
   /** The remaining bytes to be read in the current chunk. */
   private long chunkRemaining = 0;
-  /** The flag that says whether we're at the end of  */
+
+  /** The flag that says whether we're at the end of */
   private boolean isChunkEof = false;
+
   /** The number of chunks that has been read from the stream. */
   private long chunkCount = 0;
 
@@ -46,9 +53,15 @@ public class LevtusInputStream extends InputStream {
    * @param contentLength the content length of the request
    * @param isChunked the transfer mode of the request
    * @param maxChunkSize the maximum size of a chunk
-   * @param maxChunkCount  the maximum amount of chunk
+   * @param maxChunkCount the maximum amount of chunk
    */
-  public LevtusInputStream(InputStream inputStream, long maxBodySize, long contentLength, boolean isChunked, long maxChunkSize, long maxChunkCount) {
+  public LevtusInputStream(
+      InputStream inputStream,
+      long maxBodySize,
+      long contentLength,
+      boolean isChunked,
+      long maxChunkSize,
+      long maxChunkCount) {
     this.inputStream = inputStream;
     this.maxBodySize = maxBodySize;
     this.contentLength = contentLength;
@@ -79,19 +92,20 @@ public class LevtusInputStream extends InputStream {
    *
    * }</pre>
    *
-   * <p>Adapts flawlessly to chunked method if needed</p>
+   * <p>Adapts flawlessly to chunked method if needed
    *
    * @return the byte read from the stream, or -1 if the end of the stream has been reached
    * @throws PayloadTooLargeException if the total bytes read exceeds {@code maxBodySize}
    */
   @Override
   public int read() {
-    if (isChunked){
+    if (isChunked) {
       if (chunkRemaining == 0) {
         try {
           parseNextChunkHeader();
         } catch (IOException e) {
-          throw new LevtusIOException("An IO error occurred while reading from the stream (chunk header)", e);
+          throw new LevtusIOException(
+              "An IO error occurred while reading from the stream (chunk header)", e);
         }
         if (isChunkEof) return -1;
       }
@@ -99,7 +113,8 @@ public class LevtusInputStream extends InputStream {
       try {
         int b = inputStream.read();
         if (b == -1) {
-          throw new LevtusIOException("Unexpected EOF while parsing chunk stream data blocks", new IOException());
+          throw new LevtusIOException(
+              "Unexpected EOF while parsing chunk stream data blocks", new IOException());
         }
 
         chunkRemaining--;
@@ -115,7 +130,8 @@ public class LevtusInputStream extends InputStream {
 
         return b & 0xFF;
       } catch (IOException exception) {
-        throw new LevtusIOException("An IO error occurred while reading from the stream (chunk data)", exception);
+        throw new LevtusIOException(
+            "An IO error occurred while reading from the stream (chunk data)", exception);
       }
     }
 
@@ -133,7 +149,8 @@ public class LevtusInputStream extends InputStream {
         }
       }
     } catch (IOException exception) {
-      throw new LevtusIOException("An IO error occurred while reading from the stream (normal read)", exception);
+      throw new LevtusIOException(
+          "An IO error occurred while reading from the stream (normal read)", exception);
     }
     return b;
   }
@@ -151,7 +168,7 @@ public class LevtusInputStream extends InputStream {
    * }
    * }</pre>
    *
-   * <p>Adapt flawlessly when handling chunked Request</p>
+   * <p>Adapt flawlessly when handling chunked Request
    *
    * @param byteBuffer the buffer to fill with data
    * @param offset the start offset in the destination array {@code byteBuffer}
@@ -159,11 +176,10 @@ public class LevtusInputStream extends InputStream {
    * @return the total number of bytes read into the buffer, or {@code -1} if the end of the
    *     stream/content-length has been reached.
    * @throws PayloadTooLargeException if the total bytes read exceeds {@code maxBodySize}
-   *
    */
   @Override
   public int read(byte[] byteBuffer, int offset, int length) {
-    if (isChunked){
+    if (isChunked) {
       return readChunked(byteBuffer, offset, length);
     }
 
@@ -192,7 +208,9 @@ public class LevtusInputStream extends InputStream {
         }
       }
     } catch (IOException exception) {
-      throw new LevtusIOException("An IO error occurred while reading from the stream (normal buffer, offset, length read)", exception);
+      throw new LevtusIOException(
+          "An IO error occurred while reading from the stream (normal buffer, offset, length read)",
+          exception);
     }
     return newlyReadBytes;
   }
@@ -216,13 +234,14 @@ public class LevtusInputStream extends InputStream {
    * @throws LevtusIOException if an unexpected IO error occurs
    * @throws PayloadTooLargeException if the total size has exceeded the maxBodySize
    */
-  int readChunked(byte[] byteBuffer, int offset, int length) throws LevtusIOException, PayloadTooLargeException {
+  int readChunked(byte[] byteBuffer, int offset, int length)
+      throws LevtusIOException, PayloadTooLargeException {
     if (isChunkEof) {
       return -1;
     }
 
     try {
-      if (chunkRemaining == 0){
+      if (chunkRemaining == 0) {
         parseNextChunkHeader();
         if (isChunkEof) return -1;
       }
@@ -236,18 +255,20 @@ public class LevtusInputStream extends InputStream {
       chunkRemaining -= newlyReadBytes;
       this.bytesRead += newlyReadBytes;
 
-      if (this.bytesRead > maxBodySize){
+      if (this.bytesRead > maxBodySize) {
         throw new PayloadTooLargeException("The total Payload is too large");
       }
 
-      if (chunkRemaining == 0){
+      if (chunkRemaining == 0) {
         readCRLF();
       }
 
       return newlyReadBytes;
 
     } catch (IOException e) {
-      throw new LevtusIOException("An IO error occurred while reading from the stream (chunk buffer, offset, length error)", e);
+      throw new LevtusIOException(
+          "An IO error occurred while reading from the stream (chunk buffer, offset, length error)",
+          e);
     }
   }
 
@@ -265,10 +286,9 @@ public class LevtusInputStream extends InputStream {
     }
 
     long chunkSize;
-    try{
+    try {
       chunkSize = Long.parseLong(sizeLine, 16);
-    }
-    catch (NumberFormatException e){
+    } catch (NumberFormatException e) {
       throw new IOException("Malformed HTTP chunk size: " + sizeLine);
     }
 
@@ -276,7 +296,7 @@ public class LevtusInputStream extends InputStream {
       throw new PayloadTooLargeException("The incoming chunk is too large");
     }
 
-    if (chunkSize == 0){
+    if (chunkSize == 0) {
       isChunkEof = true;
       readCRLF();
       return;
@@ -314,17 +334,17 @@ public class LevtusInputStream extends InputStream {
     StringBuilder sb = new StringBuilder();
     int c;
     int lineSize = 0;
-    while ((c = inputStream.read()) != -1){
+    while ((c = inputStream.read()) != -1) {
       lineSize++;
       if (lineSize > maxChunkSize) {
         throw new PayloadTooLargeException("Payload too large");
       }
 
       if (c == '\r') {
-       int next = inputStream.read();
-       if (next == '\n') break;
-       sb.append((char) c);
-       if (next != -1) sb.append((char) next);
+        int next = inputStream.read();
+        if (next == '\n') break;
+        sb.append((char) c);
+        if (next != -1) sb.append((char) next);
       } else {
         sb.append((char) c);
       }
@@ -335,7 +355,8 @@ public class LevtusInputStream extends InputStream {
   /**
    * Intentional no-op method override.
    *
-   * <p>Because the socket lifecycle is managed by {@link io.github.bernardusz.levtus.engine.LevtusEngine}.</p>
+   * <p>Because the socket lifecycle is managed by {@link
+   * io.github.bernardusz.levtus.engine.LevtusEngine}.
    */
   @Override
   public void close() {
@@ -343,5 +364,4 @@ public class LevtusInputStream extends InputStream {
     // because the HTTP connection may be reused for keep-alive requests.
     // The socket lifecycle is managed by HttpConnectionHandler.
   }
-
 }

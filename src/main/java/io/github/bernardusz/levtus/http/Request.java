@@ -28,10 +28,10 @@ public class Request {
   private final long maxBodySize;
   private final long maxChunkSize;
   private final long maxChunkCount;
+  private final HttpProtocol protocol;
   private byte[] cachedBody;
   private LevtusInputStream activeStream;
   private boolean streamConsumed = false;
-  private final HttpProtocol protocol;
 
   /**
    * Initializes the internal state of an incoming request.
