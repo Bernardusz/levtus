@@ -200,6 +200,24 @@ public class LevtusEngine {
   }
 
   /**
+   * Set the initial socket timeout for all incoming HTTP requests
+   *
+   * @param initialSocketTimeout the initial socket timeout
+   */
+  public void setInitialSocketTimeout(int initialSocketTimeout){
+    handler.setInitialSocketTimeout(initialSocketTimeout);
+  }
+
+  /**
+   * Set the processing socket timeout for all incoming HTTP requests
+   *
+   * @param processingSocketTimeout the processing socket timeout
+   */
+  public void setProcessingSocketTimeout(int processingSocketTimeout){
+    handler.setProcessingSocketTimeout(processingSocketTimeout);
+  }
+
+  /**
    * The helper method to send a 503 Service Unavailable response.
    *
    * <p>When the server is overloaded by request (Semaphore is full) this helper method will be

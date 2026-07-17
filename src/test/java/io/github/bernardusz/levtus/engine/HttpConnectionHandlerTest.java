@@ -148,4 +148,21 @@ class HttpConnectionHandlerTest {
     handler.setMaxChunkCount(1000);
     assertEquals(1000, handler.getMaxChunkCount());
   }
+
+  @Test
+  void testInitialSocketTimeout() {
+    assertEquals(5000, handler.getInitialSocketTimeout()); // Default
+
+    handler.setInitialSocketTimeout(1000);
+    assertEquals(1000, handler.getInitialSocketTimeout());
+  }
+
+  @Test
+  void testProcessingSocketTimeout() {
+    assertEquals(20000, handler.getProcessingSocketTimeout()); // Default
+
+    handler.setProcessingSocketTimeout(1000);
+    assertEquals(1000, handler.getProcessingSocketTimeout());
+  }
+
 }

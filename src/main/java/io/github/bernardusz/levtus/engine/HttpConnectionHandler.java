@@ -22,6 +22,8 @@ class HttpConnectionHandler implements ConnectionHandler {
   private String staticFilesPath = "./public";
   private long maxChunkSize = 1024 * 1024; // 1 MB Limit
   private long maxChunkCount = 1000;
+  private int initialSocketTimeout = 5000;  // Initial request data
+  private int processingSocketTimeout = 20000;  // Processing phase
 
   /**
    * The constructor for HttpConnectionHandler.
@@ -43,14 +45,14 @@ class HttpConnectionHandler implements ConnectionHandler {
     try (client;
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
         OutputStream outputStream = client.getOutputStream()) {
-      client.setSoTimeout(5000);
+      client.setSoTimeout(initialSocketTimeout);
       Response res = new Response(outputStream, staticFilesPath, false); // At first, it is false,
       // Because we won't continue sending responses after the error
       try {
         Request req;
         while ((req = parser.parseRequest(this, inputStream, res)) != null) {
           res = new Response(outputStream, staticFilesPath, req.isKeepAlive()); // Now when we respond, that's when the isKeepAlive is needed
-          client.setSoTimeout(20000);
+          client.setSoTimeout(processingSocketTimeout);
           router.handle(req, res);
           if (!res.isSent()){
             if (res.isChunked()){
@@ -213,4 +215,41 @@ class HttpConnectionHandler implements ConnectionHandler {
   public void setStaticFiles(String staticFilesPath) {
     this.staticFilesPath = staticFilesPath;
   }
+
+  /**
+   * Get the initial socket timeout for all incoming HTTP requests.
+   *
+   * @return return the initial socket timeout for all incoming HTTP requests
+   */
+  int getInitialSocketTimeout() {
+    return initialSocketTimeout;
+  }
+
+  /**
+   * Get the processing socket timeout for all incoming HTTP requests.
+   *
+   * @return return the processing socket timeout for all incoming HTTP requests
+   */
+  int getProcessingSocketTimeout() {
+    return processingSocketTimeout;
+  }
+
+  /**
+   * Set the initial socket timeout for all incoming HTTP requests
+   *
+   * @param initialSocketTimeout the initial socket timeout
+   */
+  public void setInitialSocketTimeout(int initialSocketTimeout){
+    this.initialSocketTimeout = initialSocketTimeout;
+  }
+
+  /**
+   * Set the processing socket timeout for all incoming HTTP requests
+   *
+   * @param processingSocketTimeout the processing socket timeout
+   */
+  public void setProcessingSocketTimeout(int processingSocketTimeout){
+    this.processingSocketTimeout = processingSocketTimeout;
+  }
+
 }
