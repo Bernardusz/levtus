@@ -1,13 +1,15 @@
 package io.github.bernardusz.levtus.engine;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
-import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
+import io.github.bernardusz.levtus.routing.Router;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,12 +26,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class HttpParserTest {
-  @Mock private HttpConnectionHandler mockHandler;
+  private HttpConnectionHandler handler;
   private HttpParser parser;
+  private Router router;
+  @Mock private Response mockResponse;
 
   @BeforeEach
   void setUp() {
     parser = new HttpParser();
+    router = new Router();
+    handler = new HttpConnectionHandler(router, parser);
   }
 
   @Test
@@ -45,7 +51,7 @@ class HttpParserTest {
   void testReadLine() throws IOException {
     InputStream mockInputStream = Mockito.mock(InputStream.class);
     // Standard HTTP newline is \r\n (13, 10)
-    Mockito.when(mockInputStream.read()).thenReturn(10, 13, -1);
+    when(mockInputStream.read()).thenReturn(10, 13, -1);
 
     String line = parser.readLine(mockInputStream, 10);
     assertEquals("", line); // Empty string for a blank line (no newline - \n)
@@ -54,7 +60,7 @@ class HttpParserTest {
     assertNull(secondLine); // null for end of stream
 
     InputStream mockInputStream2 = Mockito.mock(InputStream.class);
-    Mockito.when(mockInputStream2.read()).thenReturn((int) 'G', 13, 10, -1);
+    when(mockInputStream2.read()).thenReturn((int) 'G', 13, 10, -1);
 
     String line2 = parser.readLine(mockInputStream2, 10);
     assertEquals("G", line2);
@@ -64,7 +70,7 @@ class HttpParserTest {
   void testReadLineTooLarge() throws IOException {
     InputStream mockInputStream = Mockito.mock(InputStream.class);
     // Return 'A' indefinitely to exceed the limit
-    Mockito.when(mockInputStream.read()).thenReturn((int) 'A');
+    when(mockInputStream.read()).thenReturn((int) 'A');
 
     assertThrows(
         HeaderTooLargeException.class,
@@ -215,7 +221,7 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseHeadersHeaderNotImplemented() {
+  void testParseHeadersHeaderImplemented() {
     String requestLine =
         "Host: localhost:8080\r\n"
             + "User-Agent: Mozilla/5.0\r\n"
@@ -225,8 +231,8 @@ class HttpParserTest {
     InputStream mockInputStream =
         new ByteArrayInputStream(requestLine.getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(
-        LevtusNotImplementedException.class, () -> parser.parseHeaders(mockInputStream, 8192, 20));
+    assertDoesNotThrow(
+        () -> parser.parseHeaders(mockInputStream, 8192, 20));
   }
 
   @Test
@@ -238,7 +244,7 @@ class HttpParserTest {
     headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
-    assertDoesNotThrow(() -> parser.validateBodySize(headers, 10 * 1024 * 1024));
+    assertDoesNotThrow(() -> parser.validateBodySize(headers, 10 * 1024 * 1024, mockResponse));
   }
 
   @Test
@@ -251,7 +257,7 @@ class HttpParserTest {
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
     assertThrows(
-        BadRequestException.class, () -> parser.validateBodySize(headers, 10 * 1024 * 1024));
+        BadRequestException.class, () -> parser.validateBodySize(headers, 10 * 1024 * 1024, mockResponse));
   }
 
   @Test
@@ -263,13 +269,55 @@ class HttpParserTest {
     headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
     headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
 
-    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10));
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
   }
 
   @Test
-  void testParseRawPath() { // Currently there is a bug in parseRawPath. If client only pass the
-    // domain name without http/https, the route will be broken
-    // (localhost:8080/ instead of /)
+  void testValidateBodySizePerRoute(){
+    Map<String, List<String>> headers = new HashMap<>();
+
+    headers.put("Host".toLowerCase().trim(), List.of("localhost:8080".trim()));
+    headers.put("User-Agent".toLowerCase().trim(), List.of("Mozilla/5.0".trim()));
+    headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
+    headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
+
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
+  }
+
+  @Test
+  void testValidateBodySize100Continue(){
+    Map<String, List<String>> headers = new HashMap<>();
+
+    headers.put("Host".toLowerCase().trim(), List.of("localhost:8080".trim()));
+    headers.put("User-Agent".toLowerCase().trim(), List.of("Mozilla/5.0".trim()));
+    headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
+    headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
+    headers.put("Expect".toLowerCase().trim(), List.of("100-continue".trim()));
+
+    when(mockResponse.status(anyInt())).thenReturn(mockResponse);
+
+    assertDoesNotThrow(() -> parser.validateBodySize(headers, 20, mockResponse));
+    verify(mockResponse).status(100);
+    verify(mockResponse).send();
+  }
+
+  @Test
+  void testValidateBodySize100ContinueNotCalled(){
+    Map<String, List<String>> headers = new HashMap<>();
+
+    headers.put("Host".toLowerCase().trim(), List.of("localhost:8080".trim()));
+    headers.put("User-Agent".toLowerCase().trim(), List.of("Mozilla/5.0".trim()));
+    headers.put("Content-Length".toLowerCase().trim(), List.of("20".trim()));
+    headers.put("Tag".toLowerCase().trim(), List.of("Wonderful".trim(), "Java".trim()));
+    headers.put("Expect".toLowerCase().trim(), List.of("100-continue".trim()));
+
+    assertThrows(PayloadTooLargeException.class, () -> parser.validateBodySize(headers, 10, mockResponse));
+    verify(mockResponse, never()).status(100);
+    verify(mockResponse, never()).send();
+  }
+
+  @Test
+  void testParseRawPath() {
     String requestLine = "GET https://start.levtus.io/kotlin?tag=awesome&tag=java&good HTTP/1.1";
 
     assertEquals("/kotlin?tag=awesome&tag=java&good", parser.parseRawPath(requestLine));
@@ -378,13 +426,7 @@ class HttpParserTest {
     InputStream inputStream =
         new ByteArrayInputStream(fullRequest.getBytes(StandardCharsets.UTF_8));
 
-    when(mockHandler.getMaxLineSize()).thenReturn(8192);
-    when(mockHandler.getMaxEmptyLines()).thenReturn(10);
-    when(mockHandler.getMaxHeaderSize()).thenReturn(8192);
-    when(mockHandler.getMaxHeaderCount()).thenReturn(100);
-    when(mockHandler.getMaxBodySize()).thenReturn(1024);
-
-    Request request = parser.parseRequest(mockHandler, inputStream);
+    Request request = parser.parseRequest(handler, inputStream, mockResponse);
 
     assertNotNull(request);
     assertEquals("GET", request.method());
@@ -394,33 +436,96 @@ class HttpParserTest {
   }
 
   @Test
-  void testParseRequestSecurityVulnerabilities() throws Exception {
-    when(mockHandler.getMaxLineSize()).thenReturn(8192);
-    when(mockHandler.getMaxEmptyLines()).thenReturn(10);
-    when(mockHandler.getMaxHeaderSize()).thenReturn(8192);
-    when(mockHandler.getMaxHeaderCount()).thenReturn(100);
-    when(mockHandler.getMaxBodySize()).thenReturn(1024);
+  void testParseRequestValidateBodySizePerRoute() throws Exception {
+    String fullRequest =
+      "POST / HTTP/1.1\r\n"
+        + "Host: localhost:8080\r\n"
+        + "Content-Length: 2000\r\n"
+        + "\r\n"
+        + "hello";
+    InputStream inputStream =
+      new ByteArrayInputStream(fullRequest.getBytes(StandardCharsets.UTF_8));
 
+    router.post("/", ctx -> {});
+
+    assertDoesNotThrow( // default is 8192
+      () -> {
+        parser.parseRequest(handler, inputStream, mockResponse);
+      }
+    );
+  }
+
+  @Test
+  void testParseRequestValidateBodySizePerRouteNotAllowed() throws Exception {
+    String fullRequest =
+      "POST / HTTP/1.1\r\n"
+        + "Host: localhost:8080\r\n"
+        + "Content-Length: 2000\r\n"
+        + "\r\n"
+        + "hello";
+    InputStream inputStream =
+      new ByteArrayInputStream(fullRequest.getBytes(StandardCharsets.UTF_8));
+
+    router.post("/", ctx -> {}).limit(0);
+
+    assertThrows(PayloadTooLargeException.class, () -> parser.parseRequest(handler, inputStream, mockResponse));
+  }
+
+  @Test
+  void testParseRequestSecurityVulnerabilities() throws Exception {
     // 1. Encoded traversal: %2e%2e -> ..
     String validEncoded = "GET /foo/%2e%2e/bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is1 = new ByteArrayInputStream(validEncoded.getBytes(StandardCharsets.UTF_8));
-    Request req1 = parser.parseRequest(mockHandler, is1);
+    Request req1 = parser.parseRequest(handler, is1, mockResponse);
     assertEquals("/bar", req1.path());
 
     // 2. Malicious encoded traversal
     String malEncoded = "GET /%2e%2e/etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is2 = new ByteArrayInputStream(malEncoded.getBytes(StandardCharsets.UTF_8));
-    assertThrows(BadRequestException.class, () -> parser.parseRequest(mockHandler, is2));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is2, mockResponse));
 
     // 3. Encoded slash: %2f -> /
     String encodedSlash = "GET /foo%2fbar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is3 = new ByteArrayInputStream(encodedSlash.getBytes(StandardCharsets.UTF_8));
-    Request req3 = parser.parseRequest(mockHandler, is3);
+    Request req3 = parser.parseRequest(handler, is3, mockResponse);
     assertEquals("/foo/bar", req3.path());
 
     // 4. Null byte: %00
     String nullByteRequest = "GET /foo%00bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     InputStream is4 = new ByteArrayInputStream(nullByteRequest.getBytes(StandardCharsets.UTF_8));
-    assertThrows(BadRequestException.class, () -> parser.parseRequest(mockHandler, is4));
+    assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is4, mockResponse));
+  }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_1() {
+    String requestLine = "GET / HTTP/1.1";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_1, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_0() {
+    String requestLine = "GET / HTTP/1.0";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_0, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidRequestLine() {
+    String badRequestLine = "GET";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(badRequestLine));
+  }
+
+  @Test
+  void testParseHttpProtocol_UnsupportedVersion() {
+    String unsupportedVersion = "GET / HTTP/2.0";
+    assertThrows(io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException.class, 
+        () -> parser.parseHttpProtocol(unsupportedVersion));
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidVersionFormat() {
+    String invalidVersion = "GET / HTTP/invalid";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(invalidVersion));
   }
 }
