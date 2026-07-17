@@ -626,7 +626,7 @@ public class LevtusContext {
    * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
    */
   public LevtusContext streamFile(String path, int chunkSize) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
-    streamFile(path, chunkSize);
+    res.streamFile(path, chunkSize);
     return this;
   }
 
@@ -643,7 +643,7 @@ public class LevtusContext {
    * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
    */
   public LevtusContext streamFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
-    streamFile(path);
+    res.streamFile(path);
     return this;
   }
 
@@ -676,7 +676,7 @@ public class LevtusContext {
    * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
    */
   public LevtusContext streamFrom(InputStream is) throws LevtusIOException, ChunkedTransferException {
-    streamFrom(is);
+    res.streamFrom(is);
     return this;
   }
 

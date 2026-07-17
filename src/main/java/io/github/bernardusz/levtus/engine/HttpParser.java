@@ -72,6 +72,7 @@ class HttpParser {
     }
 
     String method = parseMethod(requestLine);
+    HttpProtocol protocol = parseHttpProtocol(requestLine);
 
     // Parse the Header
     Map<String, List<String>> headers =
@@ -113,7 +114,9 @@ class HttpParser {
         inputStream,
         handler.getMaxBodySize(),
         handler.getMaxChunkSize(),
-        handler.getMaxChunkCount());
+        handler.getMaxChunkCount(),
+        protocol
+    );
   }
 
   /**
@@ -151,7 +154,7 @@ class HttpParser {
   String parseMethod(String requestLine) throws BadRequestException {
     String[] parts = requestLine.split(" ", 3);
     if (parts.length != 3) {
-      throw new BadRequestException("400 - Bad Request");
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
     }
 
     if (!parts[2].matches("HTTP/1\\.[01]")) {
@@ -164,6 +167,32 @@ class HttpParser {
 
     return parts[0];
   }
+
+  /**
+   * The helper method for parsing the protocol of an HTTP request.
+   *
+   * @param requestLine the parsed request line
+   * @return the HttpProtocol in the form of an enum {@link HttpProtocol}
+   * @throws BadRequestException if the request line is invalid or the HTTP version is not supported
+   * @throws LevtusNotImplementedException if the HTTP version is not supported
+   */
+  HttpProtocol parseHttpProtocol(String requestLine) throws BadRequestException, LevtusNotImplementedException {
+    String[] parts = requestLine.split(" ", 3);
+    if (parts.length != 3) {
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
+    }
+
+    if (!parts[2].matches("HTTP/1\\.[01]")) {
+      if (parts[2].matches("HTTP/[0-9]+\\.[0-9]+")) {
+        throw new LevtusNotImplementedException("505 - Unsupported HTTP version");
+      } else {
+        throw new BadRequestException("400 - Bad Request (Invalid HTTP version)");
+      }
+    }
+
+    return parts[2].matches("HTTP/1.1") ? HttpProtocol.HTTP_1_1 : HttpProtocol.HTTP_1_0;
+  }
+
 
   /**
    * The helper method for parsing the headers of an HTTP request.

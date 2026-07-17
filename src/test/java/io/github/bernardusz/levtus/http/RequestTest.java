@@ -2,6 +2,7 @@ package io.github.bernardusz.levtus.http;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.bernardusz.levtus.engine.HttpProtocol;
 import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
 import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import java.io.ByteArrayInputStream;
@@ -19,11 +20,12 @@ class RequestTest {
   private final int defaultChunkSize = 64 * 1024;
   private final long defaultChunkCount = 1000;
 
+  private final HttpProtocol defaultHttpProtocol = HttpProtocol.HTTP_1_1;
   @Test
   void testBasicGetters() {
     Request request =
         new Request(
-            "GET", "/path", Map.of(), Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+            "GET", "/path", Map.of(), Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount, defaultHttpProtocol);
 
     assertEquals("GET", request.method());
     assertEquals("/path", request.path());
@@ -37,7 +39,7 @@ class RequestTest {
             "id", List.of("123"));
 
     Request request =
-        new Request("GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+        new Request("GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount, defaultHttpProtocol);
 
     assertEquals("java", request.query("tag"));
     assertEquals("123", request.query("id"));
@@ -52,7 +54,17 @@ class RequestTest {
             "id", List.of("123"));
 
     Request request =
-        new Request("GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+        new Request(
+            "GET",
+            "/test",
+            Map.of(),
+            queries,
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            defaultHttpProtocol
+        );
 
     assertEquals(List.of("java", "web"), request.queries("tag"));
     assertEquals(List.of("123"), request.queries("id"));
@@ -68,7 +80,15 @@ class RequestTest {
             "x-custom", List.of("value1", "value2"));
 
     Request request =
-        new Request("GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+        new Request("GET",
+            "/test",
+            headers, Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            defaultHttpProtocol
+        );
 
     assertEquals("application/json", request.header("Content-Type"));
     assertEquals("value1", request.header("X-Custom"));
@@ -83,7 +103,16 @@ class RequestTest {
             "x-custom", List.of("value1", "value2"));
 
     Request request =
-        new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+        new Request("GET",
+            "/",
+            headers,
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            defaultHttpProtocol
+        );
 
     assertEquals(List.of("application/json"), request.headers("Content-Type"));
     assertEquals(List.of("application/json"), request.headers("content-type"));
@@ -103,7 +132,8 @@ class RequestTest {
             new ByteArrayInputStream(new byte[0]),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
           );
     assertEquals(512, request.contentLength());
 
@@ -116,7 +146,8 @@ class RequestTest {
             new ByteArrayInputStream(new byte[0]),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
     assertEquals(0, invalidRequest.contentLength());
   }
@@ -133,7 +164,8 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertFalse(request.isCached());
@@ -154,7 +186,8 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertFalse(request.isCached(), "Should not be cached immediately");
@@ -178,7 +211,8 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertFalse(request.isCached(), "Should not be cached immediately");
@@ -206,7 +240,8 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertFalse(request.isCached());
@@ -229,7 +264,8 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
     assertTrue(request.isChunked());
   }
@@ -250,7 +286,8 @@ class RequestTest {
             new ByteArrayInputStream(chunkedBytes),
             1024,
             defaultChunkSize,
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertArrayEquals(expectedData, request.body());
@@ -272,22 +309,23 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             1,  // maxChunkSize = 1, but chunk size is 5
-            defaultChunkCount
+            defaultChunkCount,
+            defaultHttpProtocol
         );
 
     assertThrows(
         PayloadTooLargeException.class,
-        () -> request.body()
+        request::body
     );
 
     assertThrows( // Throws this instead of PayloadTooLarge because before the body is cached, the exception was thrown first
         BodyAlreadyConsumedException.class,
-        () -> request.bodyAsString()
+        request::bodyAsString
     );
 
     assertThrows(
         BodyAlreadyConsumedException.class,
-        () -> request.bodyStream()
+        request::bodyStream
     );
   }
 
@@ -306,12 +344,132 @@ class RequestTest {
             new ByteArrayInputStream(data),
             1024,
             defaultChunkSize,
-            2  // Allow only 2 chunks, but data has 3
+            2,  // Allow only 2 chunks, but data has 3
+            defaultHttpProtocol
         );
 
     assertThrows(
         PayloadTooLargeException.class,
-        () -> request.body()
+        request::body
     );
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_1_Default() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of(),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1
+        );
+    assertTrue(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_1_WithClose() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of("connection", List.of("close")),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1
+        );
+    assertFalse(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_1_WithKeepAlive() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of("connection", List.of("keep-alive")),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1
+        );
+    assertTrue(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_0_Default() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of(),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_0
+        );
+    assertFalse(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_0_WithKeepAlive() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of("connection", List.of("keep-alive")),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_0
+        );
+    assertTrue(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_HTTP_1_0_WithClose() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of("connection", List.of("close")),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_0
+        );
+    assertFalse(request.isKeepAlive());
+  }
+
+  @Test
+  void testIsKeepAlive_CaseInsensitive() {
+    Request request =
+        new Request(
+            "GET",
+            "/",
+            Map.of("connection", List.of("KEEP-ALIVE")),
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_0
+        );
+    assertTrue(request.isKeepAlive());
   }
 }

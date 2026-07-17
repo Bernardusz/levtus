@@ -1,5 +1,6 @@
 package io.github.bernardusz.levtus.http;
 
+import io.github.bernardusz.levtus.engine.HttpProtocol;
 import io.github.bernardusz.levtus.exception.developer.BodyAlreadyConsumedException;
 import io.github.bernardusz.levtus.exception.developer.DeveloperException;
 import io.github.bernardusz.levtus.exception.developer.LevtusIOException;
@@ -30,6 +31,7 @@ public class Request {
   private byte[] cachedBody;
   private LevtusInputStream activeStream;
   private boolean streamConsumed = false;
+  private final HttpProtocol protocol;
 
   /**
    * Initializes the internal state of an incoming request.
@@ -42,6 +44,7 @@ public class Request {
    * @param maxBodySize the configured absolute byte limit for the payload
    * @param maxChunkSize the maximum size of a chunk in an incoming request
    * @param maxChunkCount the maximum amount of chunk in an incoming request
+   * @param protocol    the HTTP protocol version (must not be null)
    * @implNote This constructor is primarily used internally by the Levtus engine during the HTTP
    * parsing phase.
    */
@@ -53,7 +56,8 @@ public class Request {
       InputStream bodyStream,
       long maxBodySize,
       long maxChunkSize,
-      long maxChunkCount
+      long maxChunkCount,
+      HttpProtocol protocol
       ) {
     this.method = method;
     this.path = path;
@@ -63,6 +67,7 @@ public class Request {
     this.maxBodySize = maxBodySize;
     this.maxChunkSize = maxChunkSize;
     this.maxChunkCount = maxChunkCount;
+    this.protocol = protocol;
   }
 
   /**
@@ -314,5 +319,20 @@ public class Request {
    */
   public String bodyAsString() throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
     return new String(body(), StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Check the connection header to determine if the connection should be kept alive.
+   *
+   * @return true if the connection should be kept alive, false otherwise
+   */
+  public boolean isKeepAlive() {
+    String connectionHeader = header("connection");
+    if (protocol.equals(HttpProtocol.HTTP_1_0)) {
+      return "keep-alive".equalsIgnoreCase(connectionHeader);
+    } else {
+      // HTTP/1.1 - keep-alive is default
+      return !"close".equalsIgnoreCase(connectionHeader);
+    }
   }
 }
