@@ -168,7 +168,9 @@ class LevtusTest {
         .maxHeaderSize(4096)
         .maxLineSize(4096)
         .maxEmptyLines(3)
-        .staticFiles("public");
+        .staticFiles("public")
+        .initialSocketTimeout(5000)
+        .processingSocketTimeout(20000);
   }
 
   @Test

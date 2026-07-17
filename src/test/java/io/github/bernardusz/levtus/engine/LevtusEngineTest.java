@@ -65,4 +65,21 @@ class LevtusEngineTest {
 
     verify(mockSocket).close();
   }
+
+  @Test
+  void testInitialSocketTimeout() {
+    assertEquals(5000, engine.handler.getInitialSocketTimeout()); // Default
+
+    engine.handler.setInitialSocketTimeout(1000);
+    assertEquals(1000, engine.handler.getInitialSocketTimeout());
+  }
+
+  @Test
+  void testProcessingSocketTimeout() {
+    assertEquals(20000, engine.handler.getProcessingSocketTimeout()); // Default
+
+    engine.handler.setProcessingSocketTimeout(1000);
+    assertEquals(1000, engine.handler.getProcessingSocketTimeout());
+  }
+
 }

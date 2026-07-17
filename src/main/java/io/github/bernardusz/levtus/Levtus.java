@@ -198,6 +198,28 @@ public class Levtus {
   }
 
   /**
+   * Set the initial socket timeout for all incoming HTTP requests
+   *
+   * @param initialSocketTimeout the initial socket timeout
+   * @return The current Levtus instance for method chaining
+   */
+  public Levtus initialSocketTimeout(int initialSocketTimeout) {
+    engine.setInitialSocketTimeout(initialSocketTimeout);
+    return this;
+  }
+
+  /**
+   * Set the processing socket timeout for all incoming HTTP requests
+   *
+   * @param processingSocketTimeout the processing socket timeout
+   * @return The current Levtus instance for method chaining
+   */
+  public Levtus processingSocketTimeout(int processingSocketTimeout) {
+    engine.setProcessingSocketTimeout(processingSocketTimeout);
+    return this;
+  }
+
+  /**
    * Binds the Levtus application to a specific TCP port and boots the server.
    *
    * @implNote This is a blocking operation; the main thread will halt here while the server is
