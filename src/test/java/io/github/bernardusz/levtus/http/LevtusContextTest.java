@@ -3,22 +3,33 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.github.bernardusz.levtus.engine.HttpProtocol;
+import io.github.bernardusz.levtus.exception.developer.ChunkedTransferException;
+import io.github.bernardusz.levtus.exception.developer.FileNotFound;
+import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class LevtusContextTest {
 
+  private final int defaultChunkSize = 64 * 1024;
+  private final long defaultChunkCount = 1000;
+  @TempDir Path tempDir;
   Map<String, String> pathParams;
   @Mock private Request mockRequest;
   private Response realResponse;
@@ -30,7 +41,7 @@ class LevtusContextTest {
     mockRequest = mock(Request.class);
 
     responseBuffer = new ByteArrayOutputStream();
-    realResponse = new Response(new BufferedOutputStream(responseBuffer), "./public");
+    realResponse = new Response(new BufferedOutputStream(responseBuffer), tempDir.toString(), true);
     pathParams = new HashMap<>();
 
     context = new LevtusContext(mockRequest, realResponse, new HashMap<>());
@@ -65,9 +76,7 @@ class LevtusContextTest {
     assertEquals("1", ctx.param("id"));
 
     // Attempt to modify the map returned by params()
-    assertThrows(UnsupportedOperationException.class, () -> {
-      ctx.params().put("id", "3");
-    });
+    assertThrows(UnsupportedOperationException.class, () -> ctx.params().put("id", "3"));
   }
 
   @Test
@@ -96,8 +105,8 @@ class LevtusContextTest {
     context.header("Server", "Levtus-0.1.1"); // This should overwrite the previous one
 
     // 3. Assert
-    assertEquals("Value", context.res.headers.get("X-Custom").get(0));
-    assertEquals("Levtus-0.1.1", context.res.headers.get("Server").get(0));
+    assertEquals("Value", context.res.headers.get("X-Custom").getFirst());
+    assertEquals("Levtus-0.1.1", context.res.headers.get("Server").getFirst());
   }
 
   @Test
@@ -133,20 +142,25 @@ class LevtusContextTest {
   }
 
   @Test
-  void testSingleValueQueriesShortcut(){
+  void testSingleValueQueriesShortcut() {
     Map<String, List<String>> queries =
-      Map.of(
-        "tag", List.of("java", "web"),
-        "id", List.of("123"));
+        Map.of(
+            "tag", List.of("java", "web"),
+            "id", List.of("123"));
 
-    Request request = new Request(
-      "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024);
+    Request request =
+        new Request(
+            "GET",
+            "/test",
+            Map.of(),
+            queries,
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals("java", ctx.query("tag"));
     assertEquals("123", ctx.query("id"));
@@ -166,21 +180,25 @@ class LevtusContextTest {
   }
 
   @Test
-  void testSingleHeaderValue(){
+  void testSingleHeaderValue() {
     Map<String, List<String>> headers =
-      Map.of(
-        "content-type", List.of("application/json"),
-        "x-custom", List.of("value1", "value2"));
+        Map.of(
+            "content-type", List.of("application/json"),
+            "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request(
-        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+        new Request(
+            "GET",
+            "/test",
+            headers,
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals("application/json", ctx.header("Content-Type"));
     assertEquals("value1", ctx.header("X-Custom"));
@@ -190,18 +208,23 @@ class LevtusContextTest {
   @Test
   void testHeadersCaseInsensitivity() {
     Map<String, List<String>> headers =
-      Map.of(
-        "content-type", List.of("application/json"),
-        "x-custom", List.of("value1", "value2"));
+        Map.of(
+            "content-type", List.of("application/json"),
+            "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024);
+        new Request(
+            "GET",
+            "/",
+            headers,
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals(List.of("application/json"), ctx.headers("Content-Type"));
     assertEquals(List.of("application/json"), ctx.headers("content-type"));
@@ -268,5 +291,202 @@ class LevtusContextTest {
 
     String rawText = responseBuffer.toString(StandardCharsets.UTF_8);
     assertTrue(rawText.contains("Content-Length: 3"));
+  }
+
+  @Test
+  void testSendFile_Path_ShouldDelegate() throws Exception {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    context.sendFile(testFile);
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("Hello World"));
+  }
+
+  @Test
+  void testSendFile_String_ShouldDelegate() throws Exception {
+    Path testFile = tempDir.resolve("sample.txt");
+    Files.writeString(testFile, "Hello World");
+
+    context.sendFile("sample.txt");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("Hello World"));
+  }
+
+  @Test
+  void testSendFile_String_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> context.sendFile("nonexistent.txt"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendFile_String_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.txt");
+    Files.writeString(secretFile, "sensitive data");
+
+    assertThrows(PathTraversalException.class, () -> context.sendFile("../secret.txt"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendBinary_Path_ShouldDelegate() throws Exception {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    context.sendBinary(binaryFile);
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Content-Type: application/octet-stream"));
+    assertTrue(rawResponse.contains("010101"));
+  }
+
+  @Test
+  void testSendBinary_String_ShouldDelegate() throws Exception {
+    Path binaryFile = tempDir.resolve("image.bin");
+    Files.writeString(binaryFile, "010101");
+
+    context.sendBinary("image.bin");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Content-Type: application/octet-stream"));
+    assertTrue(rawResponse.contains("010101"));
+  }
+
+  @Test
+  void testSendBinary_String_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> context.sendBinary("nonexistent.bin"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSendBinary_String_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.bin");
+    Files.writeString(secretFile, "sensitive data");
+
+    assertThrows(PathTraversalException.class, () -> context.sendBinary("../secret.bin"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testRender_ShouldDelegate() throws Exception {
+    Path htmlFile = tempDir.resolve("index.html");
+    Files.writeString(htmlFile, "<h1>Hello</h1>");
+
+    context.render("index.html");
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(rawResponse.contains("<h1>Hello</h1>"));
+  }
+
+  @Test
+  void testRender_ShouldThrowFileNotFound() {
+    assertThrows(FileNotFound.class, () -> context.render("missing.html"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testRender_ShouldThrowPathTraversalException() throws Exception {
+    Path outsideDir = tempDir.getParent();
+    Path secretFile = outsideDir.resolve("secret.html");
+    Files.writeString(secretFile, "<h1>Secret</h1>");
+
+    assertThrows(PathTraversalException.class, () -> context.render("../secret.html"));
+
+    assertFalse(context.res.isSent());
+  }
+
+  @Test
+  void testSetChunkSizeAttribute() {
+    context.withChunkSize(1024);
+    assertEquals(1024, context.chunkSize());
+
+    context.withChunkSize(2048);
+    assertEquals(2048, context.chunkSize());
+  }
+
+  @Test
+  void testChainingChunkedMethodAndResult() {
+    context.withChunkSize(1024).stream()
+        .sendChunk("Hello ")
+        .sendChunk("World! ", 0, 7)
+        .sendChunk("This is ".getBytes())
+        .sendChunk("Levtus!".getBytes(), 0, 7)
+        .finishChunkedResponse();
+
+    assertTrue(context.res.isSent());
+    String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("HTTP/1.1 200"));
+    assertTrue(
+        rawResponse.contains(
+            "6\r\nHello \r\n7\r\nWorld! \r\n8\r\nThis is \r\n7\r\nLevtus!\r\n0\r\n\r\n"));
+  }
+
+  @Test
+  void testDownload() {
+    context.download("file.pdf");
+    assertEquals(
+        "attachment; filename=\"file.pdf\"", context.res.headers.get("Content-Disposition").get(0));
+  }
+
+  @Test
+  void testDownloadFile() throws Exception {
+    Path testFile = tempDir.resolve("test.txt");
+    Files.writeString(testFile, "content");
+
+    context.downloadFile(testFile);
+    assertTrue(context.res.isSent());
+  }
+
+  @Test
+  void testDownloadResponse() {
+    context.res.status(200).download("file.pdf").text("Ok!");
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertEquals(
+        List.of("attachment; filename=\"file.pdf\""),
+        context.res.headers.get("Content-Disposition"));
+  }
+
+  @Test
+  void testDownloadFileResponse() throws IOException, FileNotFound, PathTraversalException {
+    Path testFile = tempDir.resolve("download.txt");
+    Files.writeString(testFile, "test content");
+
+    context.res.downloadFile(testFile);
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertEquals(
+        List.of("attachment; filename=\"download.txt\""),
+        context.res.headers.get("Content-Disposition"));
+    assertTrue(context.res.isSent());
+  }
+
+  @Test
+  void testStreamDownloadFile()
+      throws IOException, FileNotFound, ChunkedTransferException, PathTraversalException {
+    Path testFile = tempDir.resolve("stream.txt");
+    Files.writeString(testFile, "test content");
+
+    context.stream().streamDownloadFile(testFile);
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertTrue(context.res.headers.containsKey("Transfer-Encoding"));
   }
 }

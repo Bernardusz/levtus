@@ -2,7 +2,6 @@
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.bernardusz/levtus-core)
 ![License](https://img.shields.io/github/license/Bernardusz/levtus)
 ![Maven Release](https://img.shields.io/github/actions/workflow/status/Bernardusz/levtus/release.yml?label=maven%20release)
-[![Qodana](https://github.com/Bernardusz/levtus/actions/workflows/qodana_code_quality.yml/badge.svg?branch=main)](https://github.com/Bernardusz/levtus/actions/workflows/qodana_code_quality.yml)
 
 **Levtus** (Latin: *Levis Conatus* - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of **Java 21+ Virtual Threads (Project Loom)**.
 

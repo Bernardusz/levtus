@@ -1,13 +1,13 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.LevtusHttpException;
+import io.github.bernardusz.levtus.exception.http.LevtusHttpException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
 import io.github.bernardusz.levtus.spi.ConnectionHandler;
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
@@ -15,40 +15,70 @@ class HttpConnectionHandler implements ConnectionHandler {
   final Router router;
   final HttpParser parser;
   private int maxEmptyLines = 10;
-  private int maxBodySize = 10 * 1024 * 1024;
+  private long maxBodySize = 10 * 1024 * 1024;
   private int maxHeaderCount = 100;
   private int maxLineSize = 8192; // 8 KB Limit
   private int maxHeaderSize = 8192; // 8 KB Limit
   private String staticFilesPath = "./public";
+  private long maxChunkSize = 1024 * 1024; // 1 MB Limit
+  private long maxChunkCount = 1000;
+  private int initialSocketTimeout = 5000;  // Initial request data
+  private int processingSocketTimeout = 20000;  // Processing phase
 
+  /**
+   * The constructor for HttpConnectionHandler.
+   *
+   * @param router the router for HTTP Handler
+   * @param parser the parser for HTTP Parser
+   */
   public HttpConnectionHandler(Router router, HttpParser parser) {
     this.router = router;
     this.parser = parser;
   }
 
+  /**
+   * The main method that handles a client connection.
+   *
+   * @param client the client socket to process
+   */
   public void handle(Socket client) {
     try (client;
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
-        BufferedOutputStream outputStream = new BufferedOutputStream(client.getOutputStream())) {
-      client.setSoTimeout(5000);
-      Response res = new Response(outputStream, staticFilesPath);
-
+        OutputStream outputStream = client.getOutputStream()) {
+      client.setSoTimeout(initialSocketTimeout);
+      Response res = new Response(outputStream, staticFilesPath, false); // At first, it is false,
+      // Because we won't continue sending responses after the error
       try {
         Request req;
-        while ((req = parser.parseRequest(this, inputStream)) != null) {
-          res = new Response(outputStream, staticFilesPath);
-          client.setSoTimeout(20000);
+        while ((req = parser.parseRequest(this, inputStream, res)) != null) {
+          res = new Response(outputStream, staticFilesPath, req.isKeepAlive()); // Now when we respond, that's when the isKeepAlive is needed
+          client.setSoTimeout(processingSocketTimeout);
           router.handle(req, res);
-          if (!res.isSent()) {
-            res.status(404).send("404 - Not Found");
+          if (!res.isSent()){
+            if (res.isChunked()){
+              res.finishChunkedResponse();
+            }
+            else {
+              res.status(404).send("404 - Not Found");
+            }
           }
           try {
-            if (!req.isCached()) {
-              inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+            if (!req.isCached()){
+              if (req.isChunked()){
+                req.body();
+              }
+              else {
+                inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+              }
             }
           } catch (EOFException e) {
             break;
           }
+
+          if (!req.isKeepAlive()) {
+            break;
+          }
+
         }
       } catch (IllegalArgumentException e) {
         res.status(400).send("400 - Bad Request (Malformed URL)");
@@ -59,6 +89,8 @@ class HttpConnectionHandler implements ConnectionHandler {
       } catch (Exception e) {
         res.status(500).send("500 - Internal Server Error");
         throw e;
+      } finally {
+        res.finishChunkedResponse();
       }
 
     } catch (Exception e) {
@@ -90,7 +122,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @return return the max body size in a request
    */
-  int getMaxBodySize() {
+  long getMaxBodySize() {
     return maxBodySize;
   }
 
@@ -99,7 +131,7 @@ class HttpConnectionHandler implements ConnectionHandler {
    *
    * @param maxBodySize the max body size
    */
-  public void setMaxBodySize(int maxBodySize) {
+  public void setMaxBodySize(long maxBodySize) {
     this.maxBodySize = maxBodySize;
   }
 
@@ -157,6 +189,22 @@ class HttpConnectionHandler implements ConnectionHandler {
     this.maxHeaderSize = maxHeaderSize;
   }
 
+  long getMaxChunkSize() {
+    return maxChunkSize;
+  }
+
+  public void setMaxChunkSize(int maxChunkSize) {
+    this.maxChunkSize = maxChunkSize;
+  }
+
+  long getMaxChunkCount() {
+    return maxChunkCount;
+  }
+
+  public void setMaxChunkCount(long maxChunkCount) {
+    this.maxChunkCount = maxChunkCount;
+  }
+
   /**
    * Sets the path/directory in which all static files are set.
    *
@@ -167,4 +215,41 @@ class HttpConnectionHandler implements ConnectionHandler {
   public void setStaticFiles(String staticFilesPath) {
     this.staticFilesPath = staticFilesPath;
   }
+
+  /**
+   * Get the initial socket timeout for all incoming HTTP requests.
+   *
+   * @return return the initial socket timeout for all incoming HTTP requests
+   */
+  int getInitialSocketTimeout() {
+    return initialSocketTimeout;
+  }
+
+  /**
+   * Set the initial socket timeout for all incoming HTTP requests
+   *
+   * @param initialSocketTimeout the initial socket timeout
+   */
+  public void setInitialSocketTimeout(int initialSocketTimeout){
+    this.initialSocketTimeout = initialSocketTimeout;
+  }
+
+  /**
+   * Get the processing socket timeout for all incoming HTTP requests.
+   *
+   * @return return the processing socket timeout for all incoming HTTP requests
+   */
+  int getProcessingSocketTimeout() {
+    return processingSocketTimeout;
+  }
+
+  /**
+   * Set the processing socket timeout for all incoming HTTP requests
+   *
+   * @param processingSocketTimeout the processing socket timeout
+   */
+  public void setProcessingSocketTimeout(int processingSocketTimeout){
+    this.processingSocketTimeout = processingSocketTimeout;
+  }
+
 }

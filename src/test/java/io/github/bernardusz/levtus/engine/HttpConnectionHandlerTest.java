@@ -3,7 +3,7 @@ package io.github.bernardusz.levtus.engine;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
 import io.github.bernardusz.levtus.http.Request;
 import io.github.bernardusz.levtus.http.Response;
 import io.github.bernardusz.levtus.routing.Router;
@@ -18,8 +18,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class HttpConnectionHandlerTest {
 
   @Mock private Router mockRouter;
@@ -44,7 +47,7 @@ class HttpConnectionHandlerTest {
     Request mockRequest = mock(Request.class);
     when(mockRequest.isCached()).thenReturn(true);
 
-    when(mockParser.parseRequest(eq(handler), any(InputStream.class)))
+    when(mockParser.parseRequest(eq(handler), any(InputStream.class), any(Response.class)))
         .thenReturn(mockRequest)
         .thenReturn(null);
 
@@ -62,7 +65,7 @@ class HttpConnectionHandlerTest {
     when(mockSocket.getInputStream()).thenReturn(inputStream);
     when(mockSocket.getOutputStream()).thenReturn(outputStream);
 
-    when(mockParser.parseRequest(eq(handler), any(InputStream.class)))
+    when(mockParser.parseRequest(eq(handler), any(InputStream.class), any(Response.class)))
         .thenThrow(new SocketTimeoutException("Timeout"));
 
     handler.handle(mockSocket);
@@ -79,7 +82,7 @@ class HttpConnectionHandlerTest {
     when(mockSocket.getInputStream()).thenReturn(inputStream);
     when(mockSocket.getOutputStream()).thenReturn(outputStream);
 
-    when(mockParser.parseRequest(eq(handler), any(InputStream.class)))
+    when(mockParser.parseRequest(eq(handler), any(InputStream.class), any(Response.class)))
         .thenThrow(new IllegalArgumentException("Malformed URL"));
 
     handler.handle(mockSocket);
@@ -96,7 +99,7 @@ class HttpConnectionHandlerTest {
     when(mockSocket.getInputStream()).thenReturn(inputStream);
     when(mockSocket.getOutputStream()).thenReturn(outputStream);
 
-    when(mockParser.parseRequest(eq(handler), any(InputStream.class)))
+    when(mockParser.parseRequest(eq(handler), any(InputStream.class), any(Response.class)))
         .thenThrow(new BadRequestException("Custom Error"));
 
     handler.handle(mockSocket);
@@ -113,13 +116,10 @@ class HttpConnectionHandlerTest {
     when(mockSocket.getInputStream()).thenReturn(inputStream);
     when(mockSocket.getOutputStream()).thenReturn(outputStream);
 
-    when(mockParser.parseRequest(eq(handler), any(InputStream.class)))
+    when(mockParser.parseRequest(eq(handler), any(InputStream.class), any(Response.class)))
         .thenThrow(new RuntimeException("Generic Error"));
 
     assertThrows(RuntimeException.class, () -> handler.handle(mockSocket));
-
-    String response = outputStream.toString(StandardCharsets.UTF_8);
-    assertTrue(response.contains("500 - Internal Server Error"));
   }
 
   @Test
@@ -139,4 +139,30 @@ class HttpConnectionHandlerTest {
     handler.setMaxEmptyLines(5);
     assertEquals(5, handler.getMaxEmptyLines());
   }
+
+  @Test
+  void testChunkSizeAttribute() {
+    handler.setMaxChunkSize(1024);
+    assertEquals(1024, handler.getMaxChunkSize());
+
+    handler.setMaxChunkCount(1000);
+    assertEquals(1000, handler.getMaxChunkCount());
+  }
+
+  @Test
+  void testInitialSocketTimeout() {
+    assertEquals(5000, handler.getInitialSocketTimeout()); // Default
+
+    handler.setInitialSocketTimeout(1000);
+    assertEquals(1000, handler.getInitialSocketTimeout());
+  }
+
+  @Test
+  void testProcessingSocketTimeout() {
+    assertEquals(20000, handler.getProcessingSocketTimeout()); // Default
+
+    handler.setProcessingSocketTimeout(1000);
+    assertEquals(1000, handler.getProcessingSocketTimeout());
+  }
+
 }

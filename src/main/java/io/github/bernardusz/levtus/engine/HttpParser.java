@@ -1,10 +1,12 @@
 package io.github.bernardusz.levtus.engine;
 
-import io.github.bernardusz.levtus.exception.BadRequestException;
-import io.github.bernardusz.levtus.exception.HeaderTooLargeException;
-import io.github.bernardusz.levtus.exception.LevtusNotImplementedException;
-import io.github.bernardusz.levtus.exception.PayloadTooLargeException;
+import io.github.bernardusz.levtus.exception.http.BadRequestException;
+import io.github.bernardusz.levtus.exception.http.HeaderTooLargeException;
+import io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException;
+import io.github.bernardusz.levtus.exception.http.PayloadTooLargeException;
 import io.github.bernardusz.levtus.http.Request;
+import io.github.bernardusz.levtus.http.Response;
+import io.github.bernardusz.levtus.routing.Node;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +31,7 @@ class HttpParser {
    *   <li>Body
    * </ul>
    *
-   * Immediately throws an Exception if:
+   * <p>Immediately throws an Exception if:
    *
    * <ul>
    *   <li>Request line is invalid
@@ -41,20 +43,22 @@ class HttpParser {
    *
    * @param handler The handler that uses HttpParser for parsing
    * @param inputStream The stream to read the HTTP request from
+   * @param response The response object to be used for sending responses for accepting 100-Continue
+   *     request
    * @return {@link Request} A fully parsed Request object, or null if the stream is empty
    * @throws IOException If a network or stream error occurs
    * @throws BadRequestException If the request line is invalid or headers are malformed
    * @throws PayloadTooLargeException If the request's body size exceeds {@link
    *     LevtusEngine#getMaxBodySize()} or {@link HttpConnectionHandler#getMaxBodySize()}, set via
-   *     {@link LevtusEngine#setMaxBodySize(int)} or {@link
-   *     HttpConnectionHandler#setMaxBodySize(int)}
+   *     {@link LevtusEngine#setMaxBodySize(long)} or {@link
+   *     HttpConnectionHandler#setMaxBodySize(long)}
    * @throws HeaderTooLargeException If the header's total size exceeds {@link
-   *     LevtusEngine#getMaxHeaderSize()} or {@link HttpConnectionHandler#getMaxHeaderSize()} ()},
-   *     set via {@link LevtusEngine#setMaxHeaderSize(int)} or {@link
+   *     LevtusEngine#getMaxHeaderSize()} or {@link HttpConnectionHandler#getMaxHeaderSize()}, set
+   *     via {@link LevtusEngine#setMaxHeaderSize(int)} or {@link
    *     HttpConnectionHandler#setMaxHeaderSize(int)}
    * @throws LevtusNotImplementedException If the method is not implemented.
    */
-  Request parseRequest(HttpConnectionHandler handler, InputStream inputStream)
+  Request parseRequest(HttpConnectionHandler handler, InputStream inputStream, Response response)
       throws IOException,
           BadRequestException,
           PayloadTooLargeException,
@@ -68,13 +72,11 @@ class HttpParser {
     }
 
     String method = parseMethod(requestLine);
+    HttpProtocol protocol = parseHttpProtocol(requestLine);
 
     // Parse the Header
     Map<String, List<String>> headers =
         parseHeaders(inputStream, handler.getMaxHeaderSize(), handler.getMaxHeaderCount());
-
-    // Parse the Body
-    validateBodySize(headers, handler.getMaxBodySize());
 
     // Parse the Path
     String rawPath = parseRawPath(requestLine);
@@ -96,8 +98,24 @@ class HttpParser {
     Map<String, List<String>> queryParams = parseQueryParams(uri.getRawQuery());
     String normalizedPath = normalizePath(decodedPath);
 
+    // Parse the Body
+    long limit = handler.getMaxBodySize();
+    Node matchedNode = handler.router.matchRoute(method, normalizedPath);
+    if (matchedNode != null && matchedNode.getMaxBodySize() != -1) {
+      limit = matchedNode.getMaxBodySize();
+    }
+    validateBodySize(headers, limit, response);
+
     return new Request(
-        method, normalizedPath, headers, queryParams, inputStream, handler.getMaxBodySize());
+        method,
+        normalizedPath,
+        headers,
+        queryParams,
+        inputStream,
+        handler.getMaxBodySize(),
+        handler.getMaxChunkSize(),
+        handler.getMaxChunkCount(),
+        protocol);
   }
 
   /**
@@ -135,7 +153,7 @@ class HttpParser {
   String parseMethod(String requestLine) throws BadRequestException {
     String[] parts = requestLine.split(" ", 3);
     if (parts.length != 3) {
-      throw new BadRequestException("400 - Bad Request");
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
     }
 
     if (!parts[2].matches("HTTP/1\\.[01]")) {
@@ -147,6 +165,32 @@ class HttpParser {
     }
 
     return parts[0];
+  }
+
+  /**
+   * The helper method for parsing the protocol of an HTTP request.
+   *
+   * @param requestLine the parsed request line
+   * @return the HttpProtocol in the form of an enum {@link HttpProtocol}
+   * @throws BadRequestException if the request line is invalid or the HTTP version is not supported
+   * @throws LevtusNotImplementedException if the HTTP version is not supported
+   */
+  HttpProtocol parseHttpProtocol(String requestLine)
+      throws BadRequestException, LevtusNotImplementedException {
+    String[] parts = requestLine.split(" ", 3);
+    if (parts.length != 3) {
+      throw new BadRequestException("400 - Bad Request (Invalid request line)");
+    }
+
+    if (!parts[2].matches("HTTP/1\\.[01]")) {
+      if (parts[2].matches("HTTP/[0-9]+\\.[0-9]+")) {
+        throw new LevtusNotImplementedException("505 - Unsupported HTTP version");
+      } else {
+        throw new BadRequestException("400 - Bad Request (Invalid HTTP version)");
+      }
+    }
+
+    return parts[2].matches("HTTP/1.1") ? HttpProtocol.HTTP_1_1 : HttpProtocol.HTTP_1_0;
   }
 
   /**
@@ -196,9 +240,6 @@ class HttpParser {
     if (headers.get("host").size() > 1) {
       throw new BadRequestException("400 - Bad Request (Duplicate host header)");
     }
-    if (headers.get("transfer-encoding") != null) {
-      throw new LevtusNotImplementedException(headers.get("transfer-encoding").getFirst());
-    }
 
     return headers;
   }
@@ -215,29 +256,54 @@ class HttpParser {
    *
    * @param headers the headers of an HTTP request
    * @param maxBodySize the maximum body size in an HTTP request
+   * @param response the {@link Response} object used for accepting 100-Continue request
    * @throws PayloadTooLargeException if the body size exceeds the maximum allowed size {@link
    *     LevtusEngine#getMaxBodySize()} or {@link HttpConnectionHandler#getMaxBodySize()}.
    * @throws BadRequestException if more than one Content-Length header is present
    */
-  void validateBodySize(Map<String, List<String>> headers, int maxBodySize)
+  void validateBodySize(Map<String, List<String>> headers, long maxBodySize, Response response)
       throws PayloadTooLargeException, BadRequestException {
-    int contentLength;
-    List<String> lengthStrList =
-        headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
-    if (lengthStrList.size() > 1) {
-      throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
-    }
-    String lengthStr = lengthStrList.getFirst();
-    if (lengthStr != null && !lengthStr.isEmpty()) {
-      try {
-        contentLength = Integer.parseInt(lengthStr);
-        if (contentLength > maxBodySize) {
-          throw new PayloadTooLargeException(
-              "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
+    List<String> chunkedHeaders = headers.get("transfer-encoding");
+
+    boolean isChunked =
+        chunkedHeaders != null
+            && !chunkedHeaders.isEmpty()
+            && chunkedHeaders.stream().anyMatch("chunked"::equalsIgnoreCase);
+
+    if (isChunked) {
+      headers.remove("content-length");
+    } else {
+      int contentLength;
+      List<String> lengthStrList =
+          headers.getOrDefault("content-length", new ArrayList<>(List.of("0")));
+
+      if (lengthStrList != null) {
+        if (lengthStrList.isEmpty()) {
+          throw new BadRequestException("400 - Bad Request (Missing content-length header)");
         }
-      } catch (NumberFormatException e) {
-        throw new BadRequestException("400 - Bad Request (Content Length is invalid)");
+
+        if (lengthStrList.size() > 1) {
+          throw new BadRequestException("400 - Bad Request (Multiple content-length headers)");
+        }
+        String lengthStr = lengthStrList.getFirst();
+        try {
+          contentLength = Integer.parseInt(lengthStr);
+          if (contentLength > maxBodySize) {
+            throw new PayloadTooLargeException(
+                "Payload Too Large: " + contentLength + " exceeds limit of " + maxBodySize);
+          }
+
+        } catch (NumberFormatException e) {
+          throw new BadRequestException("400 - Bad Request (Content Length is invalid)");
+        }
       }
+    }
+    List<String> expectHeaders = headers.get("expect");
+
+    if (expectHeaders != null
+        && !expectHeaders.isEmpty()
+        && expectHeaders.getFirst().equalsIgnoreCase("100-continue")) {
+      response.status(100).send();
     }
   }
 
@@ -416,7 +482,7 @@ class HttpParser {
   }
 
   /**
-   * The helper method to decode a string from UTF-8
+   * The helper method to decode a string from UTF-8.
    *
    * @param body the String that needs to be decoded
    * @return a decoded String

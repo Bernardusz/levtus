@@ -121,7 +121,7 @@ public class LevtusEngine {
    *
    * @return return the max body size in a request
    */
-  int getMaxBodySize() {
+  long getMaxBodySize() {
     return handler.getMaxBodySize();
   }
 
@@ -130,7 +130,7 @@ public class LevtusEngine {
    *
    * @param maxBodySize the max body size
    */
-  public void setMaxBodySize(int maxBodySize) {
+  public void setMaxBodySize(long maxBodySize) {
     handler.setMaxBodySize(maxBodySize);
   }
 
@@ -197,6 +197,24 @@ public class LevtusEngine {
    */
   public void setStaticFiles(String staticFilesPath) {
     handler.setStaticFiles(staticFilesPath);
+  }
+
+  /**
+   * Set the initial socket timeout for all incoming HTTP requests
+   *
+   * @param initialSocketTimeout the initial socket timeout
+   */
+  public void setInitialSocketTimeout(int initialSocketTimeout) {
+    handler.setInitialSocketTimeout(initialSocketTimeout);
+  }
+
+  /**
+   * Set the processing socket timeout for all incoming HTTP requests
+   *
+   * @param processingSocketTimeout the processing socket timeout
+   */
+  public void setProcessingSocketTimeout(int processingSocketTimeout) {
+    handler.setProcessingSocketTimeout(processingSocketTimeout);
   }
 
   /**
