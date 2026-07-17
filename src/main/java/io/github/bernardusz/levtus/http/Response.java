@@ -30,6 +30,7 @@ public class Response {
   TransferMode transferMode = TransferMode.DEFAULT;
   private boolean isSent = false;
   private int chunkSize = 64 * 1024;
+  private final boolean isKeepAlive;
 
   /**
    * Initializes a new HTTP response bound to a client socket's output stream.
@@ -37,10 +38,12 @@ public class Response {
    * @implNote Automatically injects default headers like "Content-Type" and "Server".
    * @param output the buffered output stream connected to the client (must not be null)
    * @param staticFilesPath the directory path for resolving static files (must not be null)
+   * @param isKeepAlive whether the connection should be kept alive after the response is sent
    */
-  public Response(OutputStream output, String staticFilesPath) {
+  public Response(OutputStream output, String staticFilesPath, boolean isKeepAlive) {
     this.output = output;
     this.staticFilesPath = staticFilesPath;
+    this.isKeepAlive = isKeepAlive;
   }
 
   /**
@@ -725,6 +728,7 @@ public class Response {
   }
 
   private void writeHeaders() throws IOException {
+    headers.computeIfAbsent("Connection", _ -> new ArrayList<>(List.of(isKeepAlive ? "keep-alive" : "close")));
     for (var entry : headers.entrySet()) {
       for (var headerValue : entry.getValue()) {
         output.write(
@@ -735,13 +739,7 @@ public class Response {
   }
   private void writeHeaders(long contentLength) throws IOException {
     headers.put("Content-Length", new ArrayList<>(List.of(String.valueOf(contentLength))));
-    for (var entry : headers.entrySet()) {
-      for (var headerValue : entry.getValue()) {
-        output.write(
-            (purifyHeader(entry.getKey()) + ": " + purifyHeader(headerValue) + "\r\n").getBytes());
-      }
-    }
-    output.write("\r\n".getBytes());
+    writeHeaders();
   }
 
   private void writeBody(byte[] bodyBytes) throws IOException {

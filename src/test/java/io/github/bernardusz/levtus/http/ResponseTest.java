@@ -22,11 +22,12 @@ class ResponseTest {
   @TempDir Path tempDir;
   private OutputStream mockOutput;
   private Response response;
+  private final boolean defaultKeepAlive = true;
 
   @BeforeEach
   void setUp() {
     mockOutput = mock(OutputStream.class);
-    Response realResponse = new Response(mockOutput, tempDir.toString());
+    Response realResponse = new Response(mockOutput, tempDir.toString(), defaultKeepAlive);
 
     response = spy(realResponse);
   }
@@ -56,7 +57,7 @@ class ResponseTest {
 
     // 2. Use a real stream to capture raw output easily
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
     response.status(200); // Set explicit status
 
     // 3. Act
@@ -80,7 +81,7 @@ class ResponseTest {
 
     // Use a mock stream to strictly count interactions
     BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
-    Response response = new Response(mockOutput, tempDir.toString());
+    Response response = new Response(mockOutput, tempDir.toString(), defaultKeepAlive);
 
     // First call sets isSent = true and writes data
     response.sendFile(testFile);
@@ -98,13 +99,11 @@ class ResponseTest {
   @Test
   void testSendFile_ShouldThrowFileNotFound_WhenFileDoesNotExist() {
     BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
-    Response response = new Response(mockOutput, tempDir.toString());
+    Response response = new Response(mockOutput, tempDir.toString(), defaultKeepAlive);
     Path nonExistentFile = tempDir.resolve("ghost.txt");
 
     // Assert that your custom exception is thrown
-    assertThrows(FileNotFound.class, () -> {
-      response.sendFile(nonExistentFile);
-    });
+    assertThrows(FileNotFound.class, () -> response.sendFile(nonExistentFile));
   }
 
   @Test
@@ -113,7 +112,7 @@ class ResponseTest {
     Files.writeString(binaryFile, "010101");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Act
     response.sendBinary(binaryFile);
@@ -129,7 +128,7 @@ class ResponseTest {
     Files.writeString(testFile, "Hello World");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Act - using String path overload
     response.sendFile("sample.txt");
@@ -147,7 +146,7 @@ class ResponseTest {
     Files.writeString(binaryFile, "010101");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Act - using String path overload
     response.sendBinary("image.bin");
@@ -158,10 +157,8 @@ class ResponseTest {
   }
 
   @Test
-  void testRenderNotFound() throws IOException {
-    assertThrows(FileNotFound.class, () -> {
-      response.render("missing.html");
-    });
+  void testRenderNotFound() {
+    assertThrows(FileNotFound.class, () -> response.render("missing.html"));
 
     assertFalse(response.isSent()); // Making sure the response isn't sent, so devs who catch it can handle it
 
@@ -176,9 +173,7 @@ class ResponseTest {
 
     // Try to access it via traversal
     // Should have thrown PathTraversalException
-    assertThrows(PathTraversalException.class, () -> {
-      response.render("../secret.txt");
-    });
+    assertThrows(PathTraversalException.class, () -> response.render("../secret.txt"));
 
     assertFalse(response.isSent()); // Making sure the response isn't sent, so devs who catch it can handle it
   }
@@ -292,14 +287,10 @@ class ResponseTest {
 
   @Test
   void testDefaultTransferMode() {
-    assertTrue(
-        response.transferMode.equals(TransferMode.DEFAULT)
-    );
+    assertEquals(TransferMode.DEFAULT, response.transferMode);
 
     response.send("Normal send");
-    assertTrue(
-        response.transferMode.equals(TransferMode.NORMAL)
-    );
+    assertEquals(TransferMode.NORMAL, response.transferMode);
 
     assertThrows(
         ChunkedTransferException.class,
@@ -326,10 +317,7 @@ class ResponseTest {
     assertTrue(
         () -> {
           List<String> value = response.headers.get("Transfer-Encoding");
-          if (value.stream().anyMatch("chunked"::equalsIgnoreCase)){
-            return true;
-          }
-          else return false;
+          return value.stream().anyMatch("chunked"::equalsIgnoreCase);
         }
     );
   }
@@ -347,11 +335,11 @@ class ResponseTest {
   }
 
   @Test
-  void testSendingChunks() throws IOException {
+  void testSendingChunks() {
 
     // 2. Use a real stream to capture raw output easily
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
     response.status(200); // Set explicit status
 
     assertThrows(
@@ -400,7 +388,7 @@ class ResponseTest {
     Files.writeString(testFile, "Hello World");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     response.stream()
       .streamFile("sample.txt").finishChunkedResponse();
@@ -415,16 +403,12 @@ class ResponseTest {
   @Test
   void testStreamFile_ShouldThrowFileNotFound_WhenFileDoesNotExist() {
     BufferedOutputStream mockOutput = mock(BufferedOutputStream.class);
-    Response response = new Response(mockOutput, tempDir.toString());
+    Response response = new Response(mockOutput, tempDir.toString(), defaultKeepAlive);
     Path nonExistentFile = tempDir.resolve("ghost.txt");
 
     // Assert that your custom exception is thrown
-    assertThrows(FileNotFound.class, () -> {
-      response.stream().streamFile(nonExistentFile);
-    });
-    assertThrows(FileNotFound.class, () -> {
-      response.streamFile("ghost.txt");
-    });
+    assertThrows(FileNotFound.class, () -> response.stream().streamFile(nonExistentFile));
+    assertThrows(FileNotFound.class, () -> response.streamFile("ghost.txt"));
   }
 
   @Test
@@ -433,7 +417,7 @@ class ResponseTest {
     Files.writeString(testFile, "Hello World");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     response.stream()
         .streamFile("sample.txt", 400)
@@ -454,12 +438,10 @@ class ResponseTest {
     Files.writeString(secretFile, "sensitive data");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Try to access it via traversal
-    assertThrows(PathTraversalException.class, () -> {
-      response.stream().streamFile("../secret.txt");
-    });
+    assertThrows(PathTraversalException.class, () -> response.stream().streamFile("../secret.txt"));
   }
 
   @Test
@@ -468,12 +450,10 @@ class ResponseTest {
     Files.writeString(testFile, "Hello World");
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Should throw ChunkedTransferException when not in chunked mode
-    assertThrows(ChunkedTransferException.class, () -> {
-      response.streamFile(testFile);
-    });
+    assertThrows(ChunkedTransferException.class, () -> response.streamFile(testFile));
   }
 
   @Test
@@ -482,21 +462,19 @@ class ResponseTest {
     Files.createDirectory(testDir);
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Should throw FileNotFound when path is a directory
-    assertThrows(FileNotFound.class, () -> {
-      response.stream().streamFile(testDir);
-    });
+    assertThrows(FileNotFound.class, () -> response.stream().streamFile(testDir));
   }
 
   @Test
-  void testStreamFrom_InputStream_Success() throws IOException {
+  void testStreamFrom_InputStream_Success() {
     String testData = "Hello World from InputStream";
     ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     response.stream()
         .streamFrom(inputStream).finishChunkedResponse();
@@ -509,12 +487,12 @@ class ResponseTest {
   }
 
   @Test
-  void testStreamFrom_InputStream_CustomChunkSize() throws IOException {
+  void testStreamFrom_InputStream_CustomChunkSize() {
     String testData = "Hello World from InputStream";
     ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     response.stream()
         .streamFrom(inputStream, 2).finishChunkedResponse();
@@ -536,16 +514,60 @@ class ResponseTest {
   }
 
   @Test
-  void testStreamFrom_RequiresChunkedMode() throws IOException {
+  void testStreamFrom_RequiresChunkedMode() {
     String testData = "Hello World";
     ByteArrayInputStream inputStream = new ByteArrayInputStream(testData.getBytes(StandardCharsets.UTF_8));
 
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    Response response = new Response(outputStream, tempDir.toString());
+    Response response = new Response(outputStream, tempDir.toString(), defaultKeepAlive);
 
     // Should throw ChunkedTransferException when not in chunked mode
-    assertThrows(ChunkedTransferException.class, () -> {
-      response.streamFrom(inputStream);
-    });
+    assertThrows(ChunkedTransferException.class, () -> response.streamFrom(inputStream));
+  }
+
+  @Test
+  void testConnectionHeader_KeepAlive() {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString(), true);
+    
+    response.send("Hello");
+    
+    String rawResponse = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Connection: keep-alive"));
+  }
+
+  @Test
+  void testConnectionHeader_Close() {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString(), false);
+    
+    response.send("Hello");
+    
+    String rawResponse = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Connection: close"));
+  }
+
+  @Test
+  void testConnectionHeader_NotOverriddenWhenSet() {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString(), true);
+    
+    response.header("Connection", "custom");
+    response.send("Hello");
+    
+    String rawResponse = outputStream.toString(StandardCharsets.UTF_8);
+    // Should keep the custom value since it was already set
+    assertTrue(rawResponse.contains("Connection: custom"));
+  }
+
+  @Test
+  void testConnectionHeader_ChunkedTransfer() {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    Response response = new Response(outputStream, tempDir.toString(), true);
+    
+    response.stream().sendChunk("Hello").finishChunkedResponse();
+    
+    String rawResponse = outputStream.toString(StandardCharsets.UTF_8);
+    assertTrue(rawResponse.contains("Connection: keep-alive"));
   }
 }

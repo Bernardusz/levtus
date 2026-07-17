@@ -495,4 +495,37 @@ class HttpParserTest {
     InputStream is4 = new ByteArrayInputStream(nullByteRequest.getBytes(StandardCharsets.UTF_8));
     assertThrows(BadRequestException.class, () -> parser.parseRequest(handler, is4, mockResponse));
   }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_1() {
+    String requestLine = "GET / HTTP/1.1";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_1, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_HTTP_1_0() {
+    String requestLine = "GET / HTTP/1.0";
+    HttpProtocol protocol = parser.parseHttpProtocol(requestLine);
+    assertEquals(HttpProtocol.HTTP_1_0, protocol);
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidRequestLine() {
+    String badRequestLine = "GET";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(badRequestLine));
+  }
+
+  @Test
+  void testParseHttpProtocol_UnsupportedVersion() {
+    String unsupportedVersion = "GET / HTTP/2.0";
+    assertThrows(io.github.bernardusz.levtus.exception.http.LevtusNotImplementedException.class, 
+        () -> parser.parseHttpProtocol(unsupportedVersion));
+  }
+
+  @Test
+  void testParseHttpProtocol_InvalidVersionFormat() {
+    String invalidVersion = "GET / HTTP/invalid";
+    assertThrows(BadRequestException.class, () -> parser.parseHttpProtocol(invalidVersion));
+  }
 }

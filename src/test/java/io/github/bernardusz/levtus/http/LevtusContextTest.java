@@ -3,6 +3,7 @@ package io.github.bernardusz.levtus.http;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.github.bernardusz.levtus.engine.HttpProtocol;
 import io.github.bernardusz.levtus.exception.developer.FileNotFound;
 import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import java.io.BufferedOutputStream;
@@ -38,7 +39,7 @@ class LevtusContextTest {
     mockRequest = mock(Request.class);
 
     responseBuffer = new ByteArrayOutputStream();
-    realResponse = new Response(new BufferedOutputStream(responseBuffer), tempDir.toString());
+    realResponse = new Response(new BufferedOutputStream(responseBuffer), tempDir.toString(), true);
     pathParams = new HashMap<>();
 
     context = new LevtusContext(mockRequest, realResponse, new HashMap<>());
@@ -146,7 +147,16 @@ class LevtusContextTest {
         "id", List.of("123"));
 
     Request request = new Request(
-      "GET", "/test", Map.of(), queries, new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+      "GET",
+        "/test",
+        Map.of(),
+        queries,
+        new ByteArrayInputStream(new byte[0]),
+        1024,
+        defaultChunkSize,
+        defaultChunkCount,
+        HttpProtocol.HTTP_1_1
+    );
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -180,7 +190,16 @@ class LevtusContextTest {
 
     Request request =
       new Request(
-        "GET", "/test", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+        "GET",
+          "/test",
+          headers,
+          Map.of(),
+          new ByteArrayInputStream(new byte[0]),
+          1024,
+          defaultChunkSize,
+          defaultChunkCount,
+          HttpProtocol.HTTP_1_1
+      );
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -201,7 +220,16 @@ class LevtusContextTest {
         "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request("GET", "/", headers, Map.of(), new ByteArrayInputStream(new byte[0]), 1024, defaultChunkSize, defaultChunkCount);
+      new Request("GET",
+          "/",
+          headers,
+          Map.of(),
+          new ByteArrayInputStream(new byte[0]),
+          1024,
+          defaultChunkSize,
+          defaultChunkCount,
+          HttpProtocol.HTTP_1_1
+      );
 
     LevtusContext ctx = new LevtusContext(
       request,
@@ -414,7 +442,6 @@ class LevtusContextTest {
         .sendChunk("This is ".getBytes())
         .sendChunk("Levtus!".getBytes(), 0, 7)
         .finishChunkedResponse();
-    ;
 
     assertTrue(context.res.isSent());
     String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);

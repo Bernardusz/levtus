@@ -44,24 +44,39 @@ class HttpConnectionHandler implements ConnectionHandler {
         BufferedInputStream inputStream = new BufferedInputStream(client.getInputStream());
         OutputStream outputStream = client.getOutputStream()) {
       client.setSoTimeout(5000);
-      Response res = new Response(outputStream, staticFilesPath);
-
+      Response res = new Response(outputStream, staticFilesPath, false); // At first, it is false,
+      // Because we won't continue sending responses after the error
       try {
         Request req;
         while ((req = parser.parseRequest(this, inputStream, res)) != null) {
-          res = new Response(outputStream, staticFilesPath);
+          res = new Response(outputStream, staticFilesPath, req.isKeepAlive()); // Now when we respond, that's when the isKeepAlive is needed
           client.setSoTimeout(20000);
           router.handle(req, res);
-          if (!res.isSent()) {
-            res.status(404).send("404 - Not Found");
+          if (!res.isSent()){
+            if (res.isChunked()){
+              res.finishChunkedResponse();
+            }
+            else {
+              res.status(404).send("404 - Not Found");
+            }
           }
           try {
-            if (!req.isCached()) {
-              inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+            if (!req.isCached()){
+              if (req.isChunked()){
+                req.body();
+              }
+              else {
+                inputStream.skipNBytes(req.contentLength() - req.bytesRead());
+              }
             }
           } catch (EOFException e) {
             break;
           }
+
+          if (!req.isKeepAlive()) {
+            break;
+          }
+
         }
       } catch (IllegalArgumentException e) {
         res.status(400).send("400 - Bad Request (Malformed URL)");
