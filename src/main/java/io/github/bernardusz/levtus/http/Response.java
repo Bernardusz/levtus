@@ -11,6 +11,9 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -21,16 +24,17 @@ import java.util.*;
  */
 public class Response {
   private final OutputStream output;
-
+  private final boolean isKeepAlive;
+  private final DateTimeFormatter RFC_1123_DATE_TIME =
+      DateTimeFormatter.RFC_1123_DATE_TIME
+          .withZone(ZoneId.of("GMT"));
   /** The base directory path from which static files are served. */
   String staticFilesPath;
-
   int statusCode = 200;
   Map<String, List<String>> headers = new HashMap<>();
   TransferMode transferMode = TransferMode.DEFAULT;
   private boolean isSent = false;
   private int chunkSize = 64 * 1024;
-  private final boolean isKeepAlive;
 
   /**
    * Initializes a new HTTP response bound to a client socket's output stream.
@@ -277,13 +281,18 @@ public class Response {
       throw new ChunkedTransferException("Not allowed to switch mid response");
     }
 
+    if (!Files.exists(path) || Files.isDirectory(path)) {
+      throw new FileNotFound("File not found (absolute path): " + path);
+    }
+
     transferMode = TransferMode.NORMAL;
-    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of("text/plain")));
     headers.computeIfAbsent("Server", _ -> new ArrayList<>(List.of("Levtus-v0.2")));
+    headers.computeIfAbsent("Content-Type", _ -> new ArrayList<>(List.of(getMimeType(path))));
 
     try {
+      long fileSize = Files.size(path);
       writeStatus(statusCode);
-      writeHeaders();
+      writeHeaders(fileSize);
       writeBody(path);
       output.flush();
       isSent = true;
@@ -304,18 +313,7 @@ public class Response {
    * @throws PathTraversalException if the path contains traversal characters
    */
   public void sendFile(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
-    Path filePath = Path.of(staticFilesPath, path).normalize();
-    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
-    
-    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
-      throw new PathTraversalException("Path traversal detected");
-    }
-    
-    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
-      throw new FileNotFound("File not found (relative path): " + path);
-    }
-    
-    sendFile(filePath);
+    sendFile(checkPath(path));
   }
 
   /**
@@ -348,18 +346,76 @@ public class Response {
    * @throws PathTraversalException if the path contains traversal characters
    */
   public void sendBinary(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
-    Path filePath = Path.of(staticFilesPath, path).normalize();
-    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
-    
-    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
-      throw new PathTraversalException("Path traversal detected");
-    }
-    
-    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
-      throw new FileNotFound("File not found (relative path): " + path);
-    }
-    
-    sendBinary(filePath);
+    sendBinary(checkPath(path));
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the file path to send
+   * @param filename the name of the file to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public Response downloadFile(Path path, String filename) throws LevtusIOException, FileNotFound {
+    header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    sendFile(path);
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative file path to send
+   * @param filename the name of the file to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response downloadFile(String path, String filename) throws LevtusIOException, FileNotFound, PathTraversalException {
+    downloadFile(checkPath(path), filename);
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public Response downloadFile(Path path) throws LevtusIOException, FileNotFound {
+    downloadFile(path, path.getFileName().toString());
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable.
+   * Uses FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link #sendFile(Path)}</p>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative file path to send
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response downloadFile(String path) throws LevtusIOException, FileNotFound, PathTraversalException {
+    downloadFile(checkPath(path));
+    return this;
   }
 
   /**
@@ -622,18 +678,7 @@ public class Response {
    * @throws PathTraversalException if the path contains traversal characters
    */
   public Response streamFile(String path, int chunkSize) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
-    Path filePath = Path.of(staticFilesPath, path).normalize();
-    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
-
-    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
-      throw new PathTraversalException("Path traversal detected");
-    }
-
-    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
-      throw new FileNotFound("File not found (relative path): " + path);
-    }
-
-    return streamFile(filePath, chunkSize);
+    return streamFile(checkPath(path), chunkSize);
   }
 
   /**
@@ -655,6 +700,265 @@ public class Response {
    */
   public Response streamFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
     return streamFile(path, chunkSize);
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file is read into
+   * a buffer and sent as chunks with proper chunk headers. This is different from {@link #sendFile(Path)}
+   * which uses zero-copy NIO transfer and cannot be used in chunked mode.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path, filename, chunkSize);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path, filename, chunkSize);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path, filename, chunkSize);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the absolute path of the file being sent
+   * @param filename the name of the file to send
+   * @param chunkSize the size of each chunk in bytes
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamDownloadFile(Path path, String filename, int chunkSize) throws FileNotFound, LevtusIOException, ChunkedTransferException {
+    download(filename);
+    if (!isChunked()){
+      stream();
+    }
+    streamFile(path, chunkSize);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file is read into a buffer and sent as chunks with proper
+   * chunk headers. This is different from {@link #sendFile(Path)} which uses zero-copy NIO transfer
+   * and cannot be used in chunked mode.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path, filename, chunkSize);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path, filename, chunkSize);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path, filename, chunkSize);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the absolute path of the file being sent
+   * @param filename the name of the file to send
+   * @param chunkSize the size of each chunk in bytes
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response streamDownloadFile(String path, String filename, int chunkSize) throws FileNotFound, LevtusIOException, ChunkedTransferException, PathTraversalException {
+    return streamDownloadFile(checkPath(path), filename, chunkSize);
+  }
+
+
+  /**
+   * Streams a file from disk to the socket in chunked mode with configurable chunk size as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file path is resolved
+   * relative to the configured static files directory. Path traversal attacks are prevented by
+   * validating the resolved path stays within the static directory.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path, filename);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path, filename);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path, filename);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @param filename the name of the file to send
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamDownloadFile(Path path, String filename) throws LevtusIOException, ChunkedTransferException, FileNotFound {
+    return streamDownloadFile(path, filename, chunkSize);
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path, filename);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path, filename);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path, filename);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @param filename the name of the file to send
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response streamDownloadFile(String path, String filename) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    return streamDownloadFile(checkPath(path), filename);
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   */
+  public Response streamDownloadFile(Path path) throws LevtusIOException, ChunkedTransferException, FileNotFound {
+    return streamDownloadFile(path, path.getFileName().toString(), chunkSize);
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via
+   * {@link #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.</p>
+   *
+   * <p>This method can either be called without {@link #stream() or with it:}</p>
+   * <ul>
+   *   <li>
+   *     Implicit call:
+   *     {@code
+   *      ctx.streamDownloadFile(path);
+   *     } - Internally calls strea,
+   *   </li>
+   *   <li>
+   *     Explicit call:
+   *     {@code
+   *      ctx.download(filename).stream().streamDownloadFile(path);
+   *     } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   </li>
+   *   <li>
+   *     Middle ground:
+   *     {@code
+   *      ctx.download(filename).streamDownloadFile(path);
+   *     } - You can do this, but it is not recommended as Implicit calls already internally checks the filename for you
+   *   </li>
+   * </ul>
+   * <p>Internally use {@link #download(String)} to set the response as downloadable</p>
+   *
+   * @param path the relative path of the file within the static directory
+   * @return the Response object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public Response streamDownloadFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    return streamDownloadFile(checkPath(path));
   }
 
   /**
@@ -727,8 +1031,20 @@ public class Response {
     }
   }
 
+  /**
+   * Add a header to signal the browser that the response should be downloaded as a file.
+   *
+   * @param filename the filename that will be displayed by the browser (should include the file extension)
+   * @return the Response object to be chained
+   */
+  public Response download(String filename){
+    header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    return this;
+  }
+
   private void writeHeaders() throws IOException {
     headers.computeIfAbsent("Connection", _ -> new ArrayList<>(List.of(isKeepAlive ? "keep-alive" : "close")));
+    headers.computeIfAbsent("Date", _ -> new ArrayList<>(List.of(getCurrentDate())));
     for (var entry : headers.entrySet()) {
       for (var headerValue : entry.getValue()) {
         output.write(
@@ -746,11 +1062,7 @@ public class Response {
     output.write(bodyBytes);
   }
 
-  private void writeBody(Path path) throws LevtusIOException, FileNotFound {
-    if (!Files.exists(path) || Files.isDirectory(path)) {
-      throw new FileNotFound("File not found (absolute path): " + path);
-    }
-    
+  private void writeBody(Path path) throws LevtusIOException {
     try(FileChannel fileChannel = FileChannel.open(path)) {
 
       WritableByteChannel targetChannel = Channels.newChannel(output);
@@ -798,4 +1110,32 @@ public class Response {
       default -> "Unknown";
     };
   }
+  private String getCurrentDate() {
+    return RFC_1123_DATE_TIME.format(Instant.now());
+  }
+
+  private Path checkPath(String path) throws PathTraversalException, FileNotFound {
+    Path filePath = Path.of(staticFilesPath, path).normalize();
+    Path rootPath = Path.of(staticFilesPath).toAbsolutePath().normalize();
+
+    if (!filePath.toAbsolutePath().startsWith(rootPath)) {
+      throw new PathTraversalException("Path traversal detected");
+    }
+
+    if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+      throw new FileNotFound("File not found (relative path): " + path);
+    }
+
+    return filePath;
+  }
+
+  private String getMimeType(Path path) {
+    try {
+      String mimeType = Files.probeContentType(path);
+      return mimeType != null ? mimeType : "application/octet-stream";
+    } catch (IOException e) {
+      return "application/octet-stream";
+    }
+  }
+
 }

@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import io.github.bernardusz.levtus.engine.HttpProtocol;
+import io.github.bernardusz.levtus.exception.developer.ChunkedTransferException;
 import io.github.bernardusz.levtus.exception.developer.FileNotFound;
 import io.github.bernardusz.levtus.exception.developer.PathTraversalException;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -140,29 +142,25 @@ class LevtusContextTest {
   }
 
   @Test
-  void testSingleValueQueriesShortcut(){
+  void testSingleValueQueriesShortcut() {
     Map<String, List<String>> queries =
-      Map.of(
-        "tag", List.of("java", "web"),
-        "id", List.of("123"));
+        Map.of(
+            "tag", List.of("java", "web"),
+            "id", List.of("123"));
 
-    Request request = new Request(
-      "GET",
-        "/test",
-        Map.of(),
-        queries,
-        new ByteArrayInputStream(new byte[0]),
-        1024,
-        defaultChunkSize,
-        defaultChunkCount,
-        HttpProtocol.HTTP_1_1
-    );
+    Request request =
+        new Request(
+            "GET",
+            "/test",
+            Map.of(),
+            queries,
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals("java", ctx.query("tag"));
     assertEquals("123", ctx.query("id"));
@@ -182,30 +180,25 @@ class LevtusContextTest {
   }
 
   @Test
-  void testSingleHeaderValue(){
+  void testSingleHeaderValue() {
     Map<String, List<String>> headers =
-      Map.of(
-        "content-type", List.of("application/json"),
-        "x-custom", List.of("value1", "value2"));
+        Map.of(
+            "content-type", List.of("application/json"),
+            "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request(
-        "GET",
-          "/test",
-          headers,
-          Map.of(),
-          new ByteArrayInputStream(new byte[0]),
-          1024,
-          defaultChunkSize,
-          defaultChunkCount,
-          HttpProtocol.HTTP_1_1
-      );
+        new Request(
+            "GET",
+            "/test",
+            headers,
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals("application/json", ctx.header("Content-Type"));
     assertEquals("value1", ctx.header("X-Custom"));
@@ -215,27 +208,23 @@ class LevtusContextTest {
   @Test
   void testHeadersCaseInsensitivity() {
     Map<String, List<String>> headers =
-      Map.of(
-        "content-type", List.of("application/json"),
-        "x-custom", List.of("value1", "value2"));
+        Map.of(
+            "content-type", List.of("application/json"),
+            "x-custom", List.of("value1", "value2"));
 
     Request request =
-      new Request("GET",
-          "/",
-          headers,
-          Map.of(),
-          new ByteArrayInputStream(new byte[0]),
-          1024,
-          defaultChunkSize,
-          defaultChunkCount,
-          HttpProtocol.HTTP_1_1
-      );
+        new Request(
+            "GET",
+            "/",
+            headers,
+            Map.of(),
+            new ByteArrayInputStream(new byte[0]),
+            1024,
+            defaultChunkSize,
+            defaultChunkCount,
+            HttpProtocol.HTTP_1_1);
 
-    LevtusContext ctx = new LevtusContext(
-      request,
-      realResponse,
-      pathParams
-    );
+    LevtusContext ctx = new LevtusContext(request, realResponse, pathParams);
 
     assertEquals(List.of("application/json"), ctx.headers("Content-Type"));
     assertEquals(List.of("application/json"), ctx.headers("content-type"));
@@ -424,7 +413,7 @@ class LevtusContextTest {
   }
 
   @Test
-  void testSetChunkSizeAttribute(){
+  void testSetChunkSizeAttribute() {
     context.withChunkSize(1024);
     assertEquals(1024, context.chunkSize());
 
@@ -433,10 +422,8 @@ class LevtusContextTest {
   }
 
   @Test
-  void testChainingChunkedMethodAndResult(){
-    context
-        .withChunkSize(1024)
-        .stream()
+  void testChainingChunkedMethodAndResult() {
+    context.withChunkSize(1024).stream()
         .sendChunk("Hello ")
         .sendChunk("World! ", 0, 7)
         .sendChunk("This is ".getBytes())
@@ -446,6 +433,60 @@ class LevtusContextTest {
     assertTrue(context.res.isSent());
     String rawResponse = responseBuffer.toString(StandardCharsets.UTF_8);
     assertTrue(rawResponse.contains("HTTP/1.1 200"));
-    assertTrue(rawResponse.contains("6\r\nHello \r\n7\r\nWorld! \r\n8\r\nThis is \r\n7\r\nLevtus!\r\n0\r\n\r\n"));
+    assertTrue(
+        rawResponse.contains(
+            "6\r\nHello \r\n7\r\nWorld! \r\n8\r\nThis is \r\n7\r\nLevtus!\r\n0\r\n\r\n"));
+  }
+
+  @Test
+  void testDownload() {
+    context.download("file.pdf");
+    assertEquals(
+        "attachment; filename=\"file.pdf\"", context.res.headers.get("Content-Disposition").get(0));
+  }
+
+  @Test
+  void testDownloadFile() throws Exception {
+    Path testFile = tempDir.resolve("test.txt");
+    Files.writeString(testFile, "content");
+
+    context.downloadFile(testFile);
+    assertTrue(context.res.isSent());
+  }
+
+  @Test
+  void testDownloadResponse() {
+    context.res.status(200).download("file.pdf").text("Ok!");
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertEquals(
+        List.of("attachment; filename=\"file.pdf\""),
+        context.res.headers.get("Content-Disposition"));
+  }
+
+  @Test
+  void testDownloadFileResponse() throws IOException, FileNotFound, PathTraversalException {
+    Path testFile = tempDir.resolve("download.txt");
+    Files.writeString(testFile, "test content");
+
+    context.res.downloadFile(testFile);
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertEquals(
+        List.of("attachment; filename=\"download.txt\""),
+        context.res.headers.get("Content-Disposition"));
+    assertTrue(context.res.isSent());
+  }
+
+  @Test
+  void testStreamDownloadFile()
+      throws IOException, FileNotFound, ChunkedTransferException, PathTraversalException {
+    Path testFile = tempDir.resolve("stream.txt");
+    Files.writeString(testFile, "test content");
+
+    context.stream().streamDownloadFile(testFile);
+
+    assertTrue(context.res.headers.containsKey("Content-Disposition"));
+    assertTrue(context.res.headers.containsKey("Transfer-Encoding"));
   }
 }

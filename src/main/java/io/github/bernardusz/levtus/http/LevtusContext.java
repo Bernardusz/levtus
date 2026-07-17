@@ -84,7 +84,8 @@ public class LevtusContext {
    * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
    *     maxBodySize}
    */
-  public LevtusInputStream bodyStream() throws BodyAlreadyConsumedException, PayloadTooLargeException, LevtusIOException {
+  public LevtusInputStream bodyStream()
+      throws BodyAlreadyConsumedException, PayloadTooLargeException, LevtusIOException {
     return req.bodyStream();
   }
 
@@ -101,7 +102,8 @@ public class LevtusContext {
    * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
    *     maxBodySize}
    */
-  public void bodyStream(StreamConsumer consumer) throws LevtusIOException, PayloadTooLargeException, BodyAlreadyConsumedException {
+  public void bodyStream(StreamConsumer consumer)
+      throws LevtusIOException, PayloadTooLargeException, BodyAlreadyConsumedException {
     try (LevtusInputStream lis = this.bodyStream()) {
       consumer.consume(lis);
     } catch (IOException e) {
@@ -109,7 +111,7 @@ public class LevtusContext {
       throw new LevtusIOException("An I/O error occurred while reading the socket stream", e);
     } catch (BodyAlreadyConsumedException | PayloadTooLargeException e) {
       throw e;
-    } catch (RuntimeException e){
+    } catch (RuntimeException e) {
       throw new LevtusIOException("Error processing body stream", e);
     }
   }
@@ -126,23 +128,25 @@ public class LevtusContext {
    * @throws LevtusIOException if an I/O error occurs while reading the socket stream
    * @throws BodyAlreadyConsumedException if the body has already been consumed
    */
-  public byte[] body() throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
+  public byte[] body()
+      throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
     return req.body();
   }
 
   /**
-   * Retrieves the body of the request in form of String. Enforces
-   * the configured maximum body size limits to prevent memory exhaustion (OOM) attacks.
-   * <p>
-   * {@code String body = ctx.bodyAsString();}
+   * Retrieves the body of the request in form of String. Enforces the configured maximum body size
+   * limits to prevent memory exhaustion (OOM) attacks.
+   *
+   * <p>{@code String body = ctx.bodyAsString();}
    *
    * @return the body of the request as a String
-   * @throws PayloadTooLargeException     if the 'Content-Length' or actual stream data exceeds {@code
-   *                                      maxBodySize}
+   * @throws PayloadTooLargeException if the 'Content-Length' or actual stream data exceeds {@code
+   *     maxBodySize}
    * @throws BodyAlreadyConsumedException if the body has already been consumed
-   * @throws LevtusIOException            if an I/O error occurs while reading the socket stream
+   * @throws LevtusIOException if an I/O error occurs while reading the socket stream
    */
-  public String bodyAsString() throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
+  public String bodyAsString()
+      throws PayloadTooLargeException, BodyAlreadyConsumedException, LevtusIOException {
     return req.bodyAsString();
   }
 
@@ -465,7 +469,7 @@ public class LevtusContext {
    *
    * @return the current chunk size
    */
-  public int chunkSize(){
+  public int chunkSize() {
     return res.chunkSize();
   }
 
@@ -473,9 +477,9 @@ public class LevtusContext {
    * Set the default chunk size
    *
    * @param chunkSize the size of each chunk being sent
-   * @return the current Response object to be chained
+   * @return the current LevtusContext object to be chained
    */
-  public LevtusContext withChunkSize(int chunkSize){
+  public LevtusContext withChunkSize(int chunkSize) {
     res.withChunkSize(chunkSize);
     return this;
   }
@@ -483,28 +487,37 @@ public class LevtusContext {
   /**
    * Changes the responding method to {@link TransferMode#CHUNKED}.
    *
-   * <p>These following things will happen when you call {@link LevtusContext#stream()}:</p>
+   * <p>These following things will happen when you call {@link LevtusContext#stream()}:
+   *
    * <ul>
-   *   <li>The content length header is removed from Response</li>
-   *   <li>Will set the transfer encoding header to chunked</li>
-   *   <li>Will flush all the headers down the socker first</li>
+   *   <li>The content length header is removed from Response
+   *   <li>Will set the transfer encoding header to chunked
+   *   <li>Will flush all the headers down the socker first
    * </ul>
    *
-   * <p>From now on, all method that internally uses {@link Response#sendFile(Path)} or {@link Response#send(byte[])} will throw an exception of {@link ChunkedTransferException} as you cannot switch in the middle of response</p>
-   * <p>All the viable methods of responding with Chunked mode are</p>
+   * <p>From now on, all method that internally uses {@link Response#sendFile(Path)} or {@link
+   * Response#send(byte[])} will throw an exception of {@link ChunkedTransferException} as you
+   * cannot switch in the middle of response
+   *
+   * <p>All the viable methods of responding with Chunked mode are
+   *
    * <ul>
-   *   <li>{@link LevtusContext#sendChunk(byte[])} to send the chunk directly to the socket (flushed)</li>
-   *   <li>{@link LevtusContext#sendChunk(String)} to send the chunk directly to the socket (flushed)</li>
-   *   <li>{@link LevtusContext#finishChunkedResponse()} to finish the chunked response</li>
+   *   <li>{@link LevtusContext#sendChunk(byte[])} to send the chunk directly to the socket
+   *       (flushed)
+   *   <li>{@link LevtusContext#sendChunk(String)} to send the chunk directly to the socket
+   *       (flushed)
+   *   <li>{@link LevtusContext#finishChunkedResponse()} to finish the chunked response
    * </ul>
    *
-   * <p>Take as a note, that {@link LevtusContext#finishChunkedResponse()} is called in finally block, so it is safe whether you call it or not</p>
+   * <p>Take as a note, that {@link LevtusContext#finishChunkedResponse()} is called in finally
+   * block, so it is safe whether you call it or not
    *
-   * @return the Response object to be chained
-   * @throws ChunkedTransferException if stream is already called or when a bulk sending method has been called earlier
+   * @return the current LevtusContext object to be chained
+   * @throws ChunkedTransferException if stream is already called or when a bulk sending method has
+   *     been called earlier
    * @throws LevtusIOException if an unexpected IO error occurs
    */
-  public LevtusContext stream() throws LevtusIOException, ChunkedTransferException{
+  public LevtusContext stream() throws LevtusIOException, ChunkedTransferException {
     res.stream();
     return this;
   }
@@ -512,29 +525,34 @@ public class LevtusContext {
   /**
    * The method to sends the chunk of data to the socket (can be chained and used multiple times).
    *
-   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
-   * <p>Used to specifically control the offset and length the data is sent</p>
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called
+   * multiple times for sending multiple chunks
+   *
+   * <p>Used to specifically control the offset and length the data is sent
    *
    * @param data the data to be sent to the socker
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext sendChunk(byte[] data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+  public LevtusContext sendChunk(byte[] data, int offset, int length)
+      throws LevtusIOException, ChunkedTransferException {
     res.sendChunk(data, offset, length);
     return this;
   }
 
-
   /**
    * The method to sends the chunk of data to the socket (can be chained and used multiple times).
    *
-   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called
+   * multiple times for sending multiple chunks
    *
    * @param data the data to be sent to the socker
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
   public LevtusContext sendChunk(byte[] data) throws LevtusIOException, ChunkedTransferException {
     res.sendChunk(data);
@@ -542,34 +560,44 @@ public class LevtusContext {
   }
 
   /**
-   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and
+   * used multiple times).
    *
-   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
-   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
-   * <p>Used to specifically control the offset and length the data is sent</p>
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called
+   * multiple times for sending multiple chunks
+   *
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}
+   *
+   * <p>Used to specifically control the offset and length the data is sent
    *
    * @param data the data to be sent to the socker
    * @param length the length of the data
    * @param offset the offset of the data
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext sendChunk(String data, int offset, int length) throws LevtusIOException, ChunkedTransferException {
+  public LevtusContext sendChunk(String data, int offset, int length)
+      throws LevtusIOException, ChunkedTransferException {
     res.sendChunk(data.getBytes(), offset, length);
     return this;
   }
 
   /**
-   * The method to sends the chunk of data in the form of String to the socket (can be chained and used multiple times).
+   * The method to sends the chunk of data in the form of String to the socket (can be chained and
+   * used multiple times).
    *
-   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called multiple times for sending multiple chunks</p>
-   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}</p>
+   * <p>Will send the chunk directly to the socket (flushed). This method can be chained and called
+   * multiple times for sending multiple chunks
+   *
+   * <p>A helper method, internally calling {@link Response#sendChunk(byte[])}
    *
    * @param data the data to be sent to the socker
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
   public LevtusContext sendChunk(String data) throws LevtusIOException, ChunkedTransferException {
     res.sendChunk(data.getBytes());
@@ -579,17 +607,21 @@ public class LevtusContext {
   /**
    * The helper method to stream file from the disk to the socket.
    *
-   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Used to specifically control the size of each chunk that is sent</p>
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called
+   * multiple times for streaming multiple files
+   *
+   * <p>Used to specifically control the size of each chunk that is sent
    *
    * @param path the path of the file being sent
    * @param chunkSize the size of each chunk
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws FileNotFound if the file that is given is not found
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFile(Path path, int chunkSize) throws FileNotFound,  LevtusIOException, ChunkedTransferException{
+  public LevtusContext streamFile(Path path, int chunkSize)
+      throws FileNotFound, LevtusIOException, ChunkedTransferException {
     res.streamFile(path, chunkSize);
     return this;
   }
@@ -597,35 +629,42 @@ public class LevtusContext {
   /**
    * The helper method to stream file from the disk to the socker.
    *
-   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called
+   * multiple times for streaming multiple files
+   *
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}
    *
    * @param path the path of the file being sent
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws FileNotFound if the file that is given is not found
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFile(Path path) throws FileNotFound, LevtusIOException, ChunkedTransferException {
+  public LevtusContext streamFile(Path path)
+      throws FileNotFound, LevtusIOException, ChunkedTransferException {
     res.streamFile(path);
     return this;
   }
 
-
   /**
    * The helper method to stream file from the disk to the socket.
    *
-   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Used to specifically control the size of each chunk that is sent</p>
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called
+   * multiple times for streaming multiple files
+   *
+   * <p>Used to specifically control the size of each chunk that is sent
    *
    * @param path the path of the file being sent relative to {@link Response#staticFilesPath}
    * @param chunkSize the size of each chunk
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws FileNotFound if the file that is given is not found
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFile(String path, int chunkSize) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+  public LevtusContext streamFile(String path, int chunkSize)
+      throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
     res.streamFile(path, chunkSize);
     return this;
   }
@@ -633,16 +672,20 @@ public class LevtusContext {
   /**
    * The helper method to stream file from the disk to the socker.
    *
-   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   * <p>Will stream the file directly to the socket (flushed). This method can be chained and called
+   * multiple times for streaming multiple files
+   *
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}
    *
    * @param path the path of the file being sent relative to {@link Response#staticFilesPath}
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws FileNotFound if the file that is given is not found
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFile(String path) throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+  public LevtusContext streamFile(String path)
+      throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
     res.streamFile(path);
     return this;
   }
@@ -650,16 +693,20 @@ public class LevtusContext {
   /**
    * The method to stream from an input stream to the socket output stream.
    *
-   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Used to specifically control the size of each chunk that is sent</p>
+   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained
+   * and called multiple times for streaming multiple files
+   *
+   * <p>Used to specifically control the size of each chunk that is sent
    *
    * @param is the input stream for the data source
    * @param chunkSize the size of each chunk being sent
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFrom(InputStream is, int chunkSize) throws LevtusIOException, ChunkedTransferException {
+  public LevtusContext streamFrom(InputStream is, int chunkSize)
+      throws LevtusIOException, ChunkedTransferException {
     res.streamFrom(is, chunkSize);
     return this;
   }
@@ -667,15 +714,19 @@ public class LevtusContext {
   /**
    * The method to stream from an input stream to the socket output stream.
    *
-   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained and called multiple times for streaming multiple files</p>
-   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}</p>
+   * <p>Will stream the input stream directly to the socket (flushed). This method can be chained
+   * and called multiple times for streaming multiple files
+   *
+   * <p>Automatically set the chunk size to the default chunk size {@link Response#chunkSize()}
    *
    * @param is the input stream for the data source
-   * @return the Response object to be chained
+   * @return the current LevtusContext object to be chained
    * @throws LevtusIOException if an unexpected IO error occurs
-   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk sending method
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
    */
-  public LevtusContext streamFrom(InputStream is) throws LevtusIOException, ChunkedTransferException {
+  public LevtusContext streamFrom(InputStream is)
+      throws LevtusIOException, ChunkedTransferException {
     res.streamFrom(is);
     return this;
   }
@@ -683,11 +734,323 @@ public class LevtusContext {
   /**
    * The method to send the final CRLF to end the current Response.
    *
-   * <p>Internally called by the HttpConnectionHandler, it is optional to call this method or leave it as is</p>
+   * <p>Internally called by the HttpConnectionHandler, it is optional to call this method or leave
+   * it as is
    *
    * @throws LevtusIOException if an unexpected IO error occurs
    */
   public void finishChunkedResponse() throws LevtusIOException {
     res.finishChunkedResponse();
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link Response#sendFile(Path)}
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the file path to send
+   * @param filename the name of the file to send
+   * @return the current LevtusContext object to be chained
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public LevtusContext downloadFile(Path path, String filename)
+      throws LevtusIOException, FileNotFound {
+    res.downloadFile(path, filename);
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link Response#sendFile(Path)}
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative file path to send
+   * @param filename the name of the file to send
+   * @return the current LevtusContext object to be chained
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public LevtusContext downloadFile(String path, String filename)
+      throws LevtusIOException, FileNotFound, PathTraversalException {
+    res.downloadFile(path, filename);
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link Response#sendFile(Path)}
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the file path to send
+   * @return the current LevtusContext object to be chained
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   */
+  public LevtusContext downloadFile(Path path) throws LevtusIOException, FileNotFound {
+    res.downloadFile(path);
+    return this;
+  }
+
+  /**
+   * Sends a file from disk to the client using zero-copy NIO transfer as a downloadable. Uses
+   * FileChannel.transferTo() for efficient file-to-socket transfer.
+   *
+   * <p>Internally calls {@link Response#sendFile(Path)}
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative file path to send
+   * @return the current LevtusContext object to be chained
+   * @throws LevtusIOException if an I/O error occurs while transferring the file
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public LevtusContext downloadFile(String path)
+      throws LevtusIOException, FileNotFound, PathTraversalException {
+    res.downloadFile(path);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode as a download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file is read into a
+   * buffer and sent as chunks with proper chunk headers. This is different from {@link
+   * #sendFile(Path)} which uses zero-copy NIO transfer and cannot be used in chunked mode.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path, filename, chunkSize); } - Internally
+   *       calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path, filename,
+   *       chunkSize); } - Explicitly calls download with filename before stream. As stream flushed
+   *       the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path, filename,
+   *       chunkSize); } - You can do this, but it is not recommended as Implicit calls already
+   *       internally checks the filename for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the absolute path of the file being sent
+   * @param filename the name of the file to send
+   * @param chunkSize the size of each chunk in bytes
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   */
+  public LevtusContext streamDownloadFile(Path path, String filename, int chunkSize)
+      throws FileNotFound, LevtusIOException, ChunkedTransferException {
+    res.streamDownloadFile(path, filename, chunkSize);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a
+   * download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via {@link
+   * #withChunkSize(int)}. The file is read into a buffer and sent as chunks with proper chunk
+   * headers. This is different from {@link #sendFile(Path)} which uses zero-copy NIO transfer and
+   * cannot be used in chunked mode.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path, filename, chunkSize); } - Internally
+   *       calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path, filename,
+   *       chunkSize); } - Explicitly calls download with filename before stream. As stream flushed
+   *       the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path, filename,
+   *       chunkSize); } - You can do this, but it is not recommended as Implicit calls already
+   *       internally checks the filename for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the absolute path of the file being sent
+   * @param filename the name of the file to send
+   * @param chunkSize the size of each chunk in bytes
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public LevtusContext streamDownloadFile(String path, String filename, int chunkSize)
+      throws FileNotFound, LevtusIOException, ChunkedTransferException, PathTraversalException {
+    res.streamDownloadFile(path, filename, chunkSize);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode with configurable chunk size as a
+   * download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with configurable chunk size. The file path is
+   * resolved relative to the configured static files directory. Path traversal attacks are
+   * prevented by validating the resolved path stays within the static directory.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path, filename); } - Internally calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path, filename);
+   *       } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path, filename); } - You
+   *       can do this, but it is not recommended as Implicit calls already internally checks the
+   *       filename for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative path of the file within the static directory
+   * @param filename the name of the file to send
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   */
+  public LevtusContext streamDownloadFile(Path path, String filename)
+      throws LevtusIOException, ChunkedTransferException, FileNotFound {
+    res.streamDownloadFile(path, filename);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a
+   * download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via {@link
+   * #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path, filename); } - Internally calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path, filename);
+   *       } - Explicitly calls download with filename before stream. As stream flushed the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path, filename); } - You
+   *       can do this, but it is not recommended as Implicit calls already internally checks the
+   *       filename for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative path of the file within the static directory
+   * @param filename the name of the file to send
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public LevtusContext streamDownloadFile(String path, String filename)
+      throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    res.streamDownloadFile(path, filename);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a
+   * download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via {@link
+   * #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path); } - Internally calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path); } -
+   *       Explicitly calls download with filename before stream. As stream flushed the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path); } - You can do
+   *       this, but it is not recommended as Implicit calls already internally checks the filename
+   *       for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative path of the file within the static directory
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   */
+  public LevtusContext streamDownloadFile(Path path)
+      throws LevtusIOException, ChunkedTransferException, FileNotFound {
+    res.streamDownloadFile(path);
+    return this;
+  }
+
+  /**
+   * Streams a file from disk to the socket in chunked mode using the default chunk size as a
+   * download link.
+   *
+   * <p>Uses buffered transfer (not zero-copy) with the default chunk size configured via {@link
+   * #withChunkSize(int)}. The file path is resolved relative to the configured static files
+   * directory. Path traversal attacks are prevented by validating the resolved path stays within
+   * the static directory.
+   *
+   * <p>This method can either be called without {@link Response#stream() or with it:}
+   *
+   * <ul>
+   *   <li>Implicit call: {@code ctx.streamDownloadFile(path); } - Internally calls strea,
+   *   <li>Explicit call: {@code ctx.download(filename).stream().streamDownloadFile(path); } -
+   *       Explicitly calls download with filename before stream. As stream flushed the headers
+   *   <li>Middle ground: {@code ctx.download(filename).streamDownloadFile(path); } - You can do
+   *       this, but it is not recommended as Implicit calls already internally checks the filename
+   *       for you
+   * </ul>
+   *
+   * <p>Internally use {@link Response#download(String)} to set the response as downloadable
+   *
+   * @param path the relative path of the file within the static directory
+   * @return the current LevtusContext object to be chained
+   * @throws FileNotFound if the file does not exist or is a directory
+   * @throws LevtusIOException if an unexpected IO error occurs
+   * @throws ChunkedTransferException if stream hasn't been called or had already used a normal/bulk
+   *     sending method
+   * @throws PathTraversalException if the path contains traversal characters
+   */
+  public LevtusContext streamDownloadFile(String path)
+      throws LevtusIOException, ChunkedTransferException, PathTraversalException, FileNotFound {
+    res.streamDownloadFile(path);
+    return this;
+  }
+
+  /**
+   * Add a header to signal the browser that the response should be downloaded as a file.
+   *
+   * @param filename the filename that will be displayed by the browser (should include the file
+   *     extension)
+   * @return the current LevtusContext object to be chained
+   */
+  public LevtusContext download(String filename) {
+    res.download(filename);
+    return this;
   }
 }
