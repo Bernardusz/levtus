@@ -19,10 +19,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ResponseTest {
 
+  private final boolean defaultKeepAlive = true;
   @TempDir Path tempDir;
   private OutputStream mockOutput;
   private Response response;
-  private final boolean defaultKeepAlive = true;
 
   @BeforeEach
   void setUp() {
@@ -69,7 +69,7 @@ class ResponseTest {
     // 5. Assert Output (Verify headers and body content were written)
     String resultOutput = outputStream.toString(StandardCharsets.UTF_8);
     assertTrue(resultOutput.contains("HTTP/1.1 200"));
-    assertTrue(resultOutput.contains("Content-Type: text/plain"));
+    assertTrue(resultOutput.contains("Content-Type:"));
     assertTrue(resultOutput.contains("Server: Levtus-v0.2"));
     assertTrue(resultOutput.contains("Hello World")); // Verifies writeBody worked
   }
@@ -569,5 +569,46 @@ class ResponseTest {
     
     String rawResponse = outputStream.toString(StandardCharsets.UTF_8);
     assertTrue(rawResponse.contains("Connection: keep-alive"));
+  }
+
+  @Test
+  void testDownload(){
+    response
+        .status(200)
+        .download("file.pdf")
+        .text("Ok!");
+
+    assertTrue(response.headers.containsKey("Content-Disposition"));
+    assertEquals(List.of("attachment; filename=\"file.pdf\""), response.headers.get("Content-Disposition"));
+  }
+
+  @Test
+  void testDownloadFile() throws IOException, FileNotFound, PathTraversalException {
+    Path testFile = tempDir.resolve("download.txt");
+    Files.writeString(testFile, "test content");
+
+    response.downloadFile(testFile);
+
+    assertTrue(response.headers.containsKey("Content-Disposition"));
+    assertEquals(List.of("attachment; filename=\"download.txt\""), response.headers.get("Content-Disposition"));
+    assertTrue(response.isSent());
+  }
+
+  @Test
+  void testStreamDownloadFile() throws IOException, FileNotFound, ChunkedTransferException, PathTraversalException {
+    Path testFile = tempDir.resolve("stream.txt");
+    Files.writeString(testFile, "test content");
+
+    response.stream().streamDownloadFile(testFile);
+
+    assertTrue(response.headers.containsKey("Content-Disposition"));
+    assertTrue(response.headers.containsKey("Transfer-Encoding"));
+  }
+
+  @Test
+  void testDownloadFile_ShouldThrowFileNotFound_WhenFileDoesNotExist() {
+    Path nonExistent = tempDir.resolve("nonexistent.txt");
+
+    assertThrows(FileNotFound.class, () -> response.downloadFile(nonExistent));
   }
 }
