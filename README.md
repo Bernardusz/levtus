@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/github/license/Bernardusz/levtus)
 ![Maven Release](https://img.shields.io/github/actions/workflow/status/Bernardusz/levtus/release.yml?label=maven%20release)
 
-**Levtus** (Latin: *Levis Conatus* - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of **Java 21+ Virtual Threads (Project Loom)**.
+**Levtus** (Latin: *Levis Conatus* - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of **Java 21+ Virtual Threads (Project Loom)** and **Java 25+ Unnamed Instances**.
 
 > "Infrastructure should be simple, transparent, and built to last."
 
@@ -18,6 +18,7 @@
 - 📦 Zero External Dependencies: No runtime overhead, no third-party version conflicts, and tiny deployment binaries.
 - 🌳 Trie-Based Router: Route matching speed is proportional only to the depth of your URL segments (O(L)), making it consistently fast even as you add hundreds of endpoints.
 - 🔒 Built-In Security Guards: Configurable hardware safeguards prevent denial-of-service (DoS) attempts by enforcing strict size boundaries on headers during stream consumption.
+- 🌟Top focus on DX and Explicitness: Levtus focused on giving the best of Developer Experience, Explicitness, and Performance.
 - 🎯 Native Java Performance: Optimized for Java 25+, taking full advantage of modern platform innovations.
 
 ---
@@ -27,7 +28,7 @@
 - **Loom-Native Concurrency:** Uses a `newVirtualThreadPerTaskExecutor` to handle thousands of concurrent connections with minimal memory footprint.
 - **Trie-Based Routing:** Features a high-performance Prefix Tree (Trie) router for $O(K)$ route matching (where $K$ is the path length).
 - **Zero Dependencies:** Pure Java. No external libraries, no "DLL hell," and ultra-small JAR size.
-- **Hardened Security:** Built-in protection against:
+- **Configureable and Hardened Security:** Built-in protection against:
   - **Path Traversal:** Secure `render()` logic with path normalization.
   - **Memory Exhaustion:** Configurable limits for headers, body size, and line lengths.
   - **Connection Overload:** Semaphore-based throttling to protect system resources.
@@ -41,34 +42,32 @@
 ```java
 import io.github.bernardusz.levtus.Levtus;
 
-public class Main {
-    public static void main(String[] args) {
-        Levtus app = Levtus.create();
+void main() { // Java 25 Unnamed Instances!
+  Levtus app = Levtus.create();
 
-        // Middleware support
-        app.use((ctx, next) -> {
-            System.out.println("Request received: " + ctx.req().path());
-            next.run();
-        });
+  // Middleware support
+  app.use((ctx, next) -> {
+      System.out.println("Request received: " + ctx.req().path());
+      next.run();
+  });
 
-        // Simple GET route
-        app.get("/hello", ctx -> {
-            ctx.text("Hello from the Levtus Engine!");
-        });
+  // Simple GET route
+  app.get("/hello", ctx -> {
+      ctx.text("Hello from the Levtus Engine!");
+  });
 
-        // Dynamic routing with path params
-        app.get("/user/{id}", ctx -> {
-            String userId = ctx.param("id");
-            ctx.json("{\"id\": \"" + userId + "\"}");
-        });
+  // Dynamic routing with path params
+  app.get("/user/{id}", ctx -> {
+      String userId = ctx.param("id");
+      ctx.json("{\"id\": \"" + userId + "\"}");
+  });
 
-        // Secure static file rendering
-        app.get("/", ctx -> {
-            ctx.render("index.html");
-        });
+  // Secure static file rendering
+  app.get("/", ctx -> {
+      ctx.render("index.html");
+  });
 
-        app.listen(8080);
-    }
+  app.listen(8080);
 }
 ```
 
@@ -86,9 +85,9 @@ public class Main {
 ### Security Configurations
 Levtus gives you fine-grained control over your server's surface area:
 ```java
-app.setMaxBodySize(10 * 1024 * 1024); // 10MB limit
-app.setMaxHeaderCount(100);
-app.setMaxLineSize(8192); // Prevent Slowloris attacks
+app.maxBodySize(10 * 1024 * 1024); // 10MB limit
+app.maxHeaderCount(100);
+app.maxLineSize(8192); // Prevent Slowloris attacks
 ```
 
 ---
