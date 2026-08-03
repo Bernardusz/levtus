@@ -1,0 +1,28 @@
+/* .site-title img, .site-title svg {
+  height: 100%; 
+  width: 100%;
+  width: auto;
+}
+
+.title-wrapper {
+    height:5rem;
+    width: auto;
+} */
+
+.header{
+    min-height: 3rem;
+    display: flex;
+    width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.title-wrapper, site-title, site-title img{
+    min-width: 10rem;
+    min-height: 10rem;
+    width: 100%;
+    height: 100%;
+}
