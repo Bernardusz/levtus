@@ -52,8 +52,7 @@ void main() {
   app.listen(8080);
 }
 `;
-export const highlights = ['Middleware', 'route', 'Dynamic routing', 'Secure static'];
-
+export const highlights = ['app.use', 'app.get', 'ctx.text', 'ctx.json', 'app.listen'];
 export const codeSecurity = `
 Levtus app = Levtus.create();
 
@@ -68,7 +67,7 @@ app.maxConcurrentConnections(5000) // Set the maximum ammount of concurrent conn
     .processingSocketTimeout(20000); // Set the processing timeout for socket
 `;
 export const filename = 'Main.java';
-export const securityHighlights = ['', 'maxConcurrentConnections', 'maxBodySize', 'maxHeaderCount', 'staticFiles'];
+export const securityHighlights = ['maxConcurrentConnections', 'maxBodySize', 'maxHeaderCount', 'staticFiles'];
 
 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
   <img 
