@@ -7,13 +7,14 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Levtus',
+			favicon: './src/assets/Levtus_Logo-Dark_Mode.svg',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Bernardusz/Levtus' }],
 			sidebar: [
 				{
-					label: 'Guides',
+					label: 'Documentation',
 					items: [
 						// Each item here is one entry in the navigation menu.
-						{ label: 'Example Guide', slug: 'guides/example' },
+						{ autogenerate: { directory: 'docs' } },
 					],
 				},
 				{
