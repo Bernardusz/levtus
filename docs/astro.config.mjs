@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
+	site: 'https://bernardusz.github.io',
+  	base: '/levtus/', // Ensures all internal links use the repository prefix
 	integrations: [
 		starlight({
 			title: 'Levtus',
