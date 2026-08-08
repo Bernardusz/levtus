@@ -88,7 +88,7 @@ app.post("/upload", ctx -> {
 ## 📚 Request API
 > This section lists off all the undoccumented APIs inside Request. Feel free to skip.
 
-Just keep in mind, that all APIs below is documented by calling the Request object inside [LevtusContext](/docs/api/levtus-context-api). For cleaner API you can omit the `.req()`.
+Just keep in mind, that all APIs below is documented by calling the Request object inside [LevtusContext](/levtus/docs/api/levtus-context-api). For cleaner API you can omit the `.req()`.
 
 ### Checking method
 Retrieves the HTTP method used for this request.

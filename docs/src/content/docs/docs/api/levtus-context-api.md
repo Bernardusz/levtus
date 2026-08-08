@@ -3,7 +3,7 @@ title: LevtusContext API
 description: Documentation on how to handle the incoming HTTP Request and outgoing HTTP Response from a single wrapper; LevtusContext.
 ---
 
-Yep, both Request and Request are wrapped inside LevtusContext. Every example you saw in [Request](/docs/api/request-api) and [Response](/docs/api/response-api) are calling the wrapped Request and Response inside LevtusContext respectively.
+Yep, both Request and Request are wrapped inside LevtusContext. Every example you saw in [Request](/levtus/docs/api/request-api) and [Response](/levtus/docs/api/response-api) are calling the wrapped Request and Response inside LevtusContext respectively.
 
 Every single method inside Request and Response have been wrapped inside LevtusContext so you can immediately call them. For example:
 
