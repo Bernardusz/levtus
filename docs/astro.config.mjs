@@ -11,10 +11,22 @@ export default defineConfig({
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Bernardusz/Levtus' }],
 			sidebar: [
 				{
-					label: 'Documentation',
+					label: 'Docs',
 					items: [
 						// Each item here is one entry in the navigation menu.
-						{ autogenerate: { directory: 'docs' } },
+						{ label: 'Introduction', slug: 'docs' },
+						{ label: 'Getting Started', slug: 'docs/getting-started' },
+						{
+							label: 'API',
+							collapsed: true,
+							items: [
+								{ label: 'Application Creation', slug: 'docs/api/application-creation' },
+								{ label: 'Creating a Route', slug: 'docs/api/routing-parameters' },
+								{ label: 'Request API', slug: 'docs/api/request-api' },
+								{ label: 'Response API', slug: 'docs/api/response-api' },
+								{ label: 'Levtus Context API', slug: 'docs/api/levtus-context-api' }
+							]
+						}
 					],
 				},
 				{

@@ -1,0 +1,56 @@
+---
+title: Creating Levtus
+description: Documentation on how to create a new Levtus instance
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Levtus have one single entry point: Levtus instance. In this section, you will learn how to create a new Levtus instance.
+
+## Creating a new Levtus Instance
+
+You just need to create an entrance first:
+
+<Tabs>
+  <TabItem label="Unnamed instance">
+    Edit your Main.java to look like this:
+
+    ```java
+    import io.github.bernardusz.levtus.Levtus;
+
+    void main(){
+        Levtus app = Levtus.create();
+
+        app.get("/hello", ctx -> {
+          ctx.text("Hello from Levtus Engine!");
+        });
+
+        app.listen(8080);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Named instance">
+    Run the application using the Gradle `application` plugin:
+
+    ```java
+    import io.github.bernardusz.levtus.Levtus;
+
+    public class Main {
+        public static void main(String[] args) {
+          Levtus app = Levtus.create();
+
+          app.get("/hello", ctx -> {
+            ctx.text("Hello from Levtus Engine!");
+          });
+
+          app.listen(8080);
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+You can set most of Levtus' configuration via the app. But that is for later, feel free to explore, but for now, we'll continue forward.
+
+
+
