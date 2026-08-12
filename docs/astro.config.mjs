@@ -26,14 +26,17 @@ export default defineConfig({
 								{ label: 'Creating a Route', slug: 'docs/api/routing-parameters' },
 								{ label: 'Request API', slug: 'docs/api/request-api' },
 								{ label: 'Response API', slug: 'docs/api/response-api' },
-								{ label: 'Levtus Context API', slug: 'docs/api/levtus-context-api' }
+								{ label: 'Levtus Context API', slug: 'docs/api/levtus-context-api' },
+								{ label: 'Levtus Configuration', slug: 'docs/api/levtus-configuration' },
+								{ label: 'SSL/TLS Configuration', slug: 'docs/api/ssl-tsl-setup' },
+								{ label: 'Middleware Configuration', slug: 'docs/api/middleware' }
 							]
 						}
 					],
 				},
 				{
-					label: 'Reference',
-					items: [{ autogenerate: { directory: 'reference' } }],
+					label: 'Contributing',
+					slug: 'contributing-and-support',
 				},
 			],
 			logo: {
