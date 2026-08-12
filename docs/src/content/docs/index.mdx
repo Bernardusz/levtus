@@ -1,0 +1,165 @@
+---
+title: Levtus
+description: Levtus (Levis Conatus - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of Java 21+ Virtual Threads (Project Loom).
+template: splash # Remove or comment out this line to display the site sidebar on this page.
+hero:
+  tagline: Levtus is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM.
+  image:
+    dark: ../../assets/Levtus_Banner-Dark_Mode.svg
+    light: ../../assets/Levtus_Banner-Light_Mode.svg
+  actions:
+    - text: Get Started
+      link: docs
+      icon: right-arrow
+    - text: See on GitHub
+      link: https://github.com/Bernardusz/Levtus
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Code } from '@astrojs/starlight/components';
+
+export const exampleCode =
+`
+import io.github.bernardusz.levtus.Levtus;
+
+void main() {
+  Levtus app = Levtus.create();
+
+  // Middleware support
+  app.use((ctx, next) -> {
+      System.out.println("Request received: " + ctx.req().path());
+      next.run();
+  });
+
+  // Simple GET route
+  app.get("/hello", ctx -> {
+    ctx.text("Hello from the Levtus Engine!");
+  });
+
+  // Dynamic routing with path params
+  app.get("/user/{id}", ctx -> {
+    String userId = ctx.param("id");
+    ctx.json("{\"id\": \"" + userId + "\"}");
+  });
+
+  // Secure static file rendering
+  app.get("/", ctx -> {
+    ctx.render("index.html");
+  });
+
+  app.listen(8080);
+}
+`;
+export const highlights = ['app.use', 'app.get', 'ctx.text', 'ctx.json', 'app.listen'];
+export const codeSecurity = `
+Levtus app = Levtus.create();
+
+app.maxConcurrentConnections(5000) // Set the maximum ammount of concurrent connection
+    .maxBodySize(1024 * 1024) // Set the maximum body size for all route
+    .maxHeaderCount(50) // Set the maximum amount of headers in a request
+    .maxHeaderSize(4096) // Set the maximum size of headers
+    .maxLineSize(4096) // Set the maximum size of a line
+    .maxEmptyLines(3) // Set hte maximum amount of empty lines in a Keep Alive connection
+    .staticFiles("public") // Set the entry path for files
+    .initialSocketTimeout(5000) // Set the initial timeout for socket
+    .processingSocketTimeout(20000); // Set the processing timeout for socket
+`;
+export const filename = 'Main.java';
+export const securityHighlights = ['maxConcurrentConnections', 'maxBodySize', 'maxHeaderCount', 'staticFiles'];
+
+<div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+  <img 
+    src="https://img.shields.io/maven-central/v/io.github.bernardusz/levtus-core" 
+    alt="Maven Central" 
+    style={{ margin: 0, height: '20px' }} 
+  />
+  <img 
+    src="https://img.shields.io/github/license/Bernardusz/levtus" 
+    alt="License" 
+    style={{ margin: 0, height: '20px' }} 
+  />
+  <img 
+    src="https://img.shields.io/github/actions/workflow/status/Bernardusz/levtus/release.yml?label=maven%20release" 
+    alt="Maven Release" 
+    style={{ margin: 0, height: '20px' }} 
+  />
+</div>
+
+**Levtus** (Latin: *Levis Conatus* - "Light Effort") is a high-performance, zero-dependency HTTP/1.1 engine built from the ground up for the modern JVM. It is designed to be lightweight, secure, and incredibly fast by leveraging the power of **Java 21+ Virtual Threads (Project Loom)**.
+
+> "Infrastructure should be simple, transparent, and built to last."
+
+---
+
+## 🚧 **IMPORTANT - Construction Zone: Pre-v1.0.0** 
+> Levtus is currently in rapid iteration mode. We prioritize **Developer Experience (DX)** and **Performance** above all else, which means the API will evolve quickly and **breaking changes** are common. Stable Long-Term Support (LTS) will only be provided starting from version **1.0.0**.
+
+---
+
+## ✨ Why Levtus?
+
+<CardGrid stagger>
+    <Card title="Zero External Dependencies" icon="download">
+        No runtime overhead, no third-party version conflicts, and tiny deployment binaries.
+    </Card>
+    <Card title="Trie-Based Router" icon="code-branch">
+        Route matching speed is proportional only to the depth of your URL segments (O(L)), making it consistently fast even as you add hundreds of endpoints.
+    </Card>
+    <Card title="Built-In Security Guards" icon="padlock">
+        Configurable hardware safeguards prevent denial-of-service (DoS) attempts by enforcing strict size boundaries on headers during stream consumption.
+    </Card>
+    <Card title="Native Java Performance" icon="seti:java">
+        Optimized for Java 25+, taking full advantage of modern platform innovations.
+    </Card>
+</CardGrid>
+
+---
+
+## ⚡ Technical Highlights
+
+- **Loom-Native Concurrency:** Uses a `newVirtualThreadPerTaskExecutor` to handle thousands of concurrent connections with minimal memory footprint.
+- **Trie-Based Routing:** Features a high-performance Prefix Tree (Trie) router for $O(K)$ route matching (where $K$ is the path length).
+- **Zero Dependencies:** Pure Java. No external libraries, no "DLL hell," and ultra-small JAR size.
+- **Hardened Security:** Built-in protection against:
+  - **Path Traversal:** Secure `render()` logic with path normalization.
+  - **Memory Exhaustion:** Configurable limits for headers, body size, and line lengths.
+  - **Connection Overload:** Semaphore-based throttling to protect system resources.
+- **SSL/TLS Ready:** Native support for HTTPS via PKCS12 keystores.
+- **Fluent API:** Express-inspired context handling for JSON, HTML, and binary data.
+
+---
+
+## 🚀 Quick Start
+
+<Code code={exampleCode} lang="java" title={filename} mark={highlights} />
+
+---
+
+## 🛠 Architecture & Internals
+
+### The Request Lifecycle
+1. **Connection Throttling:** A global `Semaphore` limits active connections to prevent the JVM from being overwhelmed.
+2. **Virtual Thread Hand-off:** Each socket is handed to a Virtual Thread, keeping the main loop free for new accepts.
+3. **Protocol Parsing:** Raw `InputStream` parsing for HTTP/1.1 compliance, including support for persistent connections and keep-alive.
+4. **Trie Matching:** The router traverses the Trie to find the correct handler while extracting path parameters on the fly.
+5. **Middleware Execution:** A recursive execution chain allows for powerful pre- and post-processing.
+
+### Security Configurations
+Levtus gives you fine-grained control over your server's surface area:
+
+<Code code={codeSecurity} lang="java" title={filename} mark={securityHighlights} />
+
+---
+
+## 📈 Performance
+By utilizing **Project Loom**, Levtus avoids the overhead of traditional thread-pooling and the complexity of reactive programming. It provides a simple, synchronous programming model that scales horizontally with hardware.
+
+---
+
+## 📜 License
+MIT License. Feel free to use, modify, and distribute.
+
+---
+*Built with 🐧 and raw sockets 🐧💀.*
