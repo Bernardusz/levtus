@@ -1,0 +1,142 @@
+---
+title: Getting Started
+description: Preparing you to start your own Levtus project
+---
+
+import { Tabs, TabItem, Code, FileTree } from '@astrojs/starlight/components';
+
+export const mavenCode = `
+<dependency>
+    <groupId>io.github.bernardusz</groupId>
+    <artifactId>levtus-core</artifactId>
+    <version>0.2.0</version>
+</dependency>
+`
+export const gradleCode = `implementation("io.github.bernardusz:levtus-core:0.2.0")`
+export const exampleCode =
+`
+import io.github.bernardusz.levtus.Levtus;
+
+void main() {
+  Levtus app = Levtus.create();
+
+  // Middleware support
+  app.use((ctx, next) -> {
+      System.out.println("Request received: " + ctx.req().path());
+      next.run();
+  });
+
+  // Simple GET route
+  app.get("/hello", ctx -> {
+    ctx.text("Hello from the Levtus Engine!");
+  });
+
+  // Dynamic routing with path params
+  app.get("/user/{id}", ctx -> {
+    String userId = ctx.param("id");
+    ctx.json("{\"id\": \"" + userId + "\"}");
+  });
+
+  // Secure static file rendering
+  app.get("/", ctx -> {
+    ctx.render("index.html");
+  });
+
+  app.listen(8080);
+}
+`;
+export const filename = "Main.java"; 
+
+You have chosen Levtus, so now let's get you ready to start coding right away!
+
+## System Requirements
+
+Levtus is build for the modern JVM, so you will need to have Java 25 or higher installed on your system:
+
+- Java 25 or higher (JDK)
+- Maven or Gradle build tool
+
+## Creating a new project
+
+Create your new blank Java project using your favorite IDE or build tool. Then, add Levtus as a dependency to your project.
+
+Paste the code below into your `pom.xml` or `build.gradle` file to add Levtus as a dependency to your project.
+
+<Tabs>
+  <TabItem label="Maven">
+    ```xml
+    <dependency>
+        <groupId>io.github.bernardusz</groupId>
+        <artifactId>levtus-core</artifactId>
+        <version>0.2.0</version>
+    </dependency>
+    ```
+  </TabItem>
+  <TabItem label="Gradle">
+    ```groovy
+    implementation("io.github.bernardusz:levtus-core:0.2.0")
+    ```
+  </TabItem>
+</Tabs>
+
+Or you can visit [Maven Central](https://central.sonatype.com/artifact/io.github.bernardusz/levtus-core) to get your snippet for you specific project/dependency manager
+
+## Project Directory Structure
+
+Your project directory structure should look like this:
+
+<FileTree>
+
+- pom.xml/build.gradle
+- public
+  - index.html
+- src
+  - main
+    - java
+      - Main.java
+    - test
+      - java
+        - MainTest.java
+
+</FileTree>
+
+Or it can change depending on your reverse domain name, using Kotlin or other JVM languages, but the important part is to have a `Main` file in your project
+
+## Getting Started with Levtus
+
+Paste the following snippets below to get started with your first Levtus application. You can copy and paste the code into your `Main.java` file.
+
+<Code code={exampleCode} lang="java" title={filename}/>
+
+## Serving the Application
+
+<Tabs>
+  <TabItem label="Maven">
+    Run the application directly using the `exec-maven-plugin`:
+
+    ```bash
+    mvn compile exec:java -Dexec.mainClass="Main"
+    ```
+  </TabItem>
+  <TabItem label="Gradle">
+    Run the application using the Gradle `application` plugin:
+
+    ```bash
+    ./gradlew run
+    ```
+
+    Ensure your `build.gradle` defines your entry point:
+
+    ```kotlin
+    plugins {
+        application
+    }
+
+    application {
+        mainClass.set("Main")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+Voila 🐧 You have just created your first Levtus app. Continue to the next API documentation to keep the momentum alive! 🐧🐧🐧

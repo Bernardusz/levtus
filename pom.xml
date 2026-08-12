@@ -6,7 +6,7 @@
 
     <groupId>io.github.bernardusz</groupId>
     <artifactId>levtus-core</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 
     <name>Levtus Core</name>
     <description>A high-performance, zero-dependency HTTP/1.1 engine built for the modern JVM using Virtual Threads.</description>
